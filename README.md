@@ -1,5 +1,7 @@
 # Wonderlab — WebAR creation studio
 
+> **GitHub Pages update:** See [GITHUB-PAGES-SETUP.md](GITHUB-PAGES-SETUP.md) for deploying this repository at `/AR-Web-App/`. The included workflow builds the app and publishes `site/`, not the source repository.
+
 **A little imagination. A whole new world.**
 
 A working, child-friendly MVP of a marker-based WebAR authoring platform. Build a 3D scene from a demo object library, arrange and animate it, share a self-contained project link, print a marker sheet, and view the scene through a phone camera.
@@ -72,7 +74,9 @@ npm run build
 npm run preview
 ```
 
-A ready-to-host production build is included in `site/` and can be regenerated with `npm run build`. Deploy that `site/` directory on a static HTTPS host. The app assumes it is mounted at the **domain root**. Configure SPA fallback so `/view` and `/print` serve `index.html`, while real assets keep their normal paths. A `_redirects` fallback file is included for hosts that support that syntax.
+Build with `npm run build` and deploy the generated `site/` directory on a static HTTPS host. The default base is `/` for a root-domain deployment. For a subfolder deployment, build with `VITE_BASE_PATH` set to the final folder, including a trailing slash, e.g. `VITE_BASE_PATH=/AR-Web-App/ npm run build`.
+
+The GitHub Pages workflow in `.github/workflows/static.yml` installs dependencies, gets the actual Pages `base_path`, builds with that prefix, and uploads only `./site`. It does not publish the unbuilt repository. Viewer and print links use `#page=view&scene=...` and `#page=print&scene=...` under the app's base path, so a static host does not need SPA rewrites for those new links. The legacy `/view` and `/print` routes remain supported on hosts that already have fallback, but new GitHub Pages links do not depend on them.
 
 Full-quality illustration originals are kept in `design-assets/marker-originals/`; the app uses optimised JPEGs compiled into the matching tracking targets.
 
@@ -129,6 +133,8 @@ npm test
 ```
 
 The final complete production-build run passed all **6 tests**. Details are in [docs/VERIFICATION.md](docs/VERIFICATION.md).
+
+For the GitHub Pages subfolder verification, use the commands in [GITHUB-PAGES-SETUP.md](GITHUB-PAGES-SETUP.md). The updated suite passed **7 tests** against a strict `/AR-Web-App/` deployment without SPA fallback.
 
 The included end-to-end tests cover editing and local persistence; project templates and backups; snapshot sharing to a fresh browser context; PDF download and print rendering; camera-denied fallback; mobile drawers; malformed links; and **actual MindAR detection against each bundled marker using a synthetic camera stream**, including camera shutdown on exit.
 
