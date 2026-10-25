@@ -1,3 +1,4 @@
+import { currentPage } from "./lib/deployment";
 import React, {
   useCallback,
   useEffect,
@@ -90,8 +91,19 @@ import {
 } from "./lib/projects";
 
 export default function App() {
-  if (window.location.pathname.startsWith("/view")) return <Viewer />;
-  if (window.location.pathname.startsWith("/print")) return <PrintPage />;
+  const [location, setLocation] = useState(() => window.location.href);
+  useEffect(() => {
+    const update = () => setLocation(window.location.href);
+    window.addEventListener("hashchange", update);
+    window.addEventListener("popstate", update);
+    return () => {
+      window.removeEventListener("hashchange", update);
+      window.removeEventListener("popstate", update);
+    };
+  }, []);
+  const page = currentPage();
+  if (page === "view") return <Viewer key={location} />;
+  if (page === "print") return <PrintPage key={location} />;
   return <StudioApp />;
 }
 function StudioApp() {
