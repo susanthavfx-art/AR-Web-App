@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 const key = "wonderlab.projects.v1";
+const appPath = process.env.APP_BASE_PATH || "/";
 const errorsFor = (page) => {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -15,7 +16,7 @@ test("authoring: library, transforms, history, animations, markers and local per
   page,
 }) => {
   const errors = errorsFor(page);
-  await page.goto("/");
+  await page.goto(appPath);
   await expect(page.locator(".asset-card")).toHaveCount(12);
   await expect(page.getByLabel("Object name")).toHaveValue("Earth");
   await page.getByLabel("Search objects").fill("robot");
@@ -75,7 +76,7 @@ test("templates, projects, backup export/import and deletion work", async ({
   page,
 }) => {
   const errors = errorsFor(page);
-  await page.goto("/");
+  await page.goto(appPath);
   await page
     .getByRole("button", { name: "Templates", exact: false })
     .first()
@@ -137,14 +138,14 @@ test("share snapshot travels to a fresh browser; marker PDF, print route and cam
   browser,
 }) => {
   const errors = errorsFor(page);
-  await page.goto("/");
+  await page.goto(appPath);
   await page.getByLabel("Project title").fill("Share me to a phone");
   await page.getByRole("button", { name: "Publish & share" }).click();
   await expect(
     page.getByAltText("QR code to open your AR creation on a phone"),
   ).toBeVisible();
   const link = await page.locator("#share-link").inputValue();
-  expect(link).toContain("/view#scene=");
+  expect(link).toContain(`${appPath}#page=view&scene=`);
   await page.getByRole("button", { name: "Get my printable marker" }).click();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download marker PDF" }).click();
@@ -183,7 +184,7 @@ test("share snapshot travels to a fresh browser; marker PDF, print route and cam
   await expect(
     viewer.getByRole("button", { name: "Start AR camera" }),
   ).toBeVisible();
-  await viewer.goto(link.replace("/view#", "/print#"));
+  await viewer.goto(link.replace("#page=view&", "#page=print&"));
   await expect(viewer.locator(".print-sheet h1")).toHaveText(
     "Share me to a phone",
   );
@@ -203,7 +204,7 @@ test("mobile authoring drawers and invalid shared links fail gracefully", async 
 }) => {
   const errors = errorsFor(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto(appPath);
   await expect(page.locator(".library-panel")).toBeHidden();
   await page
     .locator(".workspace-top")
@@ -225,7 +226,7 @@ test("mobile authoring drawers and invalid shared links fail gracefully", async 
     ),
   ).toBe(true);
   await page.screenshot({ path: "tests/studio-mobile.png" });
-  await page.goto("/view#scene=not-a-real-scene");
+  await page.goto(`${appPath}#page=view&scene=not-a-real-scene`);
   await expect(
     page.getByRole("heading", { name: "This wonder needs a new link." }),
   ).toBeVisible();
@@ -237,7 +238,7 @@ for (const marker of ["space-explorer", "forest-friends"]) {
     page,
   }) => {
     const errors = errorsFor(page);
-    await page.goto("/");
+    await page.goto(appPath);
     if (marker === "forest-friends") {
       await page.getByRole("button", { name: "Markers", exact: true }).click();
       await page
@@ -249,7 +250,7 @@ for (const marker of ["space-explorer", "forest-friends"]) {
     await page.getByRole("button", { name: "Publish & share" }).click();
     const link = await page.locator("#share-link").inputValue();
     await page.addInitScript(
-      ({ marker }) => {
+      ({ marker, base }) => {
         window.__testStreams = [];
         Object.defineProperty(navigator.mediaDevices, "getUserMedia", {
           configurable: true,
@@ -259,7 +260,7 @@ for (const marker of ["space-explorer", "forest-friends"]) {
             c.height = 960;
             const ctx = c.getContext("2d");
             const image = new Image();
-            image.src = `/markers/${marker}.jpg`;
+            image.src = `${base}markers/${marker}.jpg`;
             await image.decode();
             const draw = () => {
               ctx.fillStyle = "#eee";
@@ -279,10 +280,13 @@ for (const marker of ["space-explorer", "forest-friends"]) {
           },
         });
       },
-      { marker },
+      { marker, base: appPath },
     );
     await page.setViewportSize({ width: 430, height: 900 });
     await page.goto(link);
+    // A fragment-only navigation keeps the current document. Reload once so
+    // the synthetic-camera init script applies, as on a freshly opened phone.
+    await page.reload();
     await page.getByRole("button", { name: "Start AR camera" }).click();
     await expect(page.getByText("Marker found. Hello, wonder!")).toBeVisible({
       timeout: 40000,
