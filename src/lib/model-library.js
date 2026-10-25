@@ -67,10 +67,11 @@ export function normaliseModel(input) {
     throw new Error(
       "Each model needs a unique id using letters, numbers, hyphens or underscores.",
     );
+  const category = short(input.category, "General", 24);
   return {
     id: input.id,
     name: short(input.name, input.id, 45),
-    category: short(input.category, "Your models", 24),
+    category: category.toLowerCase() === "your models" ? "General" : category,
     file: relativeFile(input.file, [".glb"]),
     height: bounded(input.height, 1.5, 0.2, 4),
     rotation: [0, 1, 2].map((i) => bounded(input.rotation?.[i], 0, -360, 360)),
@@ -107,7 +108,7 @@ export function modelAsset(input) {
     category: model.category,
     bg: model.background || "#edf4ef",
     color: "#9bbab0",
-    tag: "Your GLB model",
+    tag: "Library model",
     kind: "glb",
     model,
     modelUrl: fileUrl(model.file),
