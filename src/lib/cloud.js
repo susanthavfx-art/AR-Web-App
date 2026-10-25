@@ -327,6 +327,51 @@ export async function uploadMedia(file, kind, { onProgress, signal } = {}) {
   };
 }
 
+// ---------- teacher-made markers ----------
+// The printed image and the compiled MindAR target are stored together so a
+// student's phone can download both from the published lesson.
+export async function uploadMarker(image, target, { onProgress, signal } = {}) {
+  if (!(image instanceof Blob) || image.type !== "image/jpeg")
+    throw new Error("The marker image could not be prepared.");
+  if (!(target instanceof Blob) || target.size < 1000)
+    throw new Error("The tracking data could not be prepared.");
+  if (image.size + target.size > 15 * 1024 * 1024)
+    throw new Error("This marker is too large. Try a simpler photo.");
+  const token = await accessToken();
+  const id = crypto.randomUUID();
+  const base = `${session.user.id}/markers/${id}`;
+  const total = image.size + target.size;
+  try {
+    await sendFile(
+      `${base}.jpg`,
+      image,
+      "image/jpeg",
+      token,
+      (part) => onProgress?.((part * image.size) / total),
+      signal,
+    );
+    await sendFile(
+      `${base}.mind`,
+      target,
+      "application/octet-stream",
+      token,
+      (part) => onProgress?.((image.size + part * target.size) / total),
+      signal,
+    );
+  } catch (e) {
+    if (e?.name === "AbortError" || /internet/.test(e?.message)) throw e;
+    throw new Error(
+      "The marker could not be saved. If this is the first custom marker on this website, the owner needs to run the marker storage update (MARKER-MAKER.md).",
+    );
+  }
+  onProgress?.(1);
+  return {
+    id: `custom:${id}`,
+    image: publicFileUrl(`${base}.jpg`),
+    target: publicFileUrl(`${base}.mind`),
+  };
+}
+
 // ---------- published lessons ----------
 export async function publishLesson(project) {
   const token = await accessToken();

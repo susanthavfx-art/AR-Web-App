@@ -7,6 +7,8 @@ import {
   getAsset,
   hasAsset,
   registerSharedModel,
+  registerCustomMarker,
+  isBuiltInMarker,
 } from "./assets";
 import { decodeCards, encodeCards, validateCards } from "./lesson-cards";
 import { fetchLesson, validLessonKey } from "./cloud";
@@ -129,9 +131,7 @@ export function validateProject(input) {
       typeof input.title === "string"
         ? input.title.trim().slice(0, 70) || "My new creation"
         : "My new creation",
-    markerId: MARKERS.some((m) => m.id === input.markerId)
-      ? input.markerId
-      : MARKERS[0].id,
+    markerId: MARKERS[0].id,
     updatedAt:
       typeof input.updatedAt === "string" &&
       Number.isFinite(Date.parse(input.updatedAt))
@@ -171,6 +171,17 @@ export function validateProject(input) {
         };
       }),
   };
+  if (isBuiltInMarker(input.markerId)) project.markerId = input.markerId;
+  else if (
+    input.marker &&
+    input.marker.id === String(input.markerId).toLowerCase()
+  ) {
+    const marker = registerCustomMarker(input.marker);
+    if (marker) {
+      project.markerId = marker.id;
+      project.marker = marker.definition;
+    }
+  }
   project.cards = validateCards(
     input.cards,
     new Set(project.objects.map((o) => o.id)),
@@ -210,6 +221,9 @@ export function encodeScene(project) {
     v: 2,
     n: p.title,
     m: MARKERS.findIndex((m) => m.id === p.markerId),
+    ...(p.marker
+      ? { k: [p.marker.id, p.marker.name, p.marker.image, p.marker.target] }
+      : {}),
     a: definitions,
     o: p.objects.map((o) => {
       const row = [
@@ -267,7 +281,17 @@ export function decodeScene(encoded) {
   const objectIds = data.o.map(() => crypto.randomUUID());
   return validateProject({
     title: data.n,
-    markerId: MARKERS[data.m]?.id,
+    markerId: Array.isArray(data.k) ? data.k[0] : MARKERS[data.m]?.id,
+    ...(Array.isArray(data.k)
+      ? {
+          marker: {
+            id: data.k[0],
+            name: data.k[1],
+            image: data.k[2],
+            target: data.k[3],
+          },
+        }
+      : {}),
     cards: decodeCards(data.c, objectIds),
     objects: data.o.map((row, index) => {
       if (!Array.isArray(row))

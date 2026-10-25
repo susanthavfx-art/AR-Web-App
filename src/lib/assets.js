@@ -121,7 +121,67 @@ export const MARKERS = [
     color: "#e5f1e8",
   },
 ];
-export const getMarker = (id) => MARKERS.find((m) => m.id === id) || MARKERS[0];
+// Teacher-made markers live online; their definitions travel with projects.
+const customMarkers = new Map();
+export const CUSTOM_MARKER_ID =
+  /^custom:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function httpsUrl(value) {
+  if (typeof value !== "string" || value.length > 1200) return "";
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password
+      ? url.toString()
+      : "";
+  } catch {
+    return "";
+  }
+}
+export function validateMarkerDefinition(input) {
+  if (!input || typeof input !== "object" || !CUSTOM_MARKER_ID.test(input.id))
+    return null;
+  const image = httpsUrl(input.image),
+    target = httpsUrl(input.target);
+  if (!image || !target) return null;
+  const name =
+    typeof input.name === "string" && input.name.trim()
+      ? input.name.trim().slice(0, 40)
+      : "My marker";
+  return {
+    id: input.id.toLowerCase(),
+    name,
+    image,
+    target,
+    ...(typeof input.quality === "number" && Number.isFinite(input.quality)
+      ? {
+          quality: Math.max(
+            0,
+            Math.min(1, Math.round(input.quality * 100) / 100),
+          ),
+        }
+      : {}),
+    ...(typeof input.createdAt === "string" &&
+    Number.isFinite(Date.parse(input.createdAt))
+      ? { createdAt: new Date(input.createdAt).toISOString() }
+      : {}),
+  };
+}
+export function registerCustomMarker(input) {
+  const definition = validateMarkerDefinition(input);
+  if (!definition) return null;
+  const marker = {
+    ...definition,
+    subtitle: "Made by you",
+    color: "#f3effb",
+    custom: true,
+    definition,
+  };
+  customMarkers.set(definition.id, marker);
+  return marker;
+}
+export const isBuiltInMarker = (id) => MARKERS.some((m) => m.id === id);
+export const hasMarker = (id) => isBuiltInMarker(id) || customMarkers.has(id);
+export const getMarker = (id) =>
+  MARKERS.find((m) => m.id === id) || customMarkers.get(id) || MARKERS[0];
 const sharedModels = new Map();
 export const findAsset = (id) =>
   ASSETS.find((a) => a.id === id) || sharedModels.get(id);
