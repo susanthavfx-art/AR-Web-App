@@ -70,6 +70,19 @@ import AssetImage from "./components/AssetImage";
 import Viewer from "./components/Viewer";
 import PrintPage from "./components/PrintPage";
 import ShareModal from "./components/ShareModal";
+import {
+  CardProperties,
+  LessonToolsPanel,
+  TeacherSignIn,
+} from "./components/CardEditor";
+import { CARD_ICONS, LessonCardSheet } from "./components/LessonCards";
+import {
+  CARD_TYPE_NAMES,
+  MAX_CARDS,
+  newCard,
+  validateCard,
+} from "./lib/lesson-cards";
+import { cloudEnabled, useTeacherSession } from "./lib/cloud";
 import { EmptyState, IconButton, Logo, Modal } from "./components/UI";
 import {
   ASSETS,
@@ -134,14 +147,19 @@ function StudioApp() {
     [toast, setToast] = useState(null),
     [libraryOpen, setLibraryOpen] = useState(false),
     [inspectorOpen, setInspectorOpen] = useState(false),
-    [deleteTarget, setDeleteTarget] = useState(null);
+    [deleteTarget, setDeleteTarget] = useState(null),
+    [pickCardId, setPickCardId] = useState(null),
+    [previewCard, setPreviewCard] = useState(null);
+  const teacher = useTeacherSession();
   const canvas = useRef(null),
     toastTimer = useRef(null),
     history = useRef({ past: [], future: [] }),
     importRef = useRef(null),
     latest = useRef({});
   const selected = project?.objects.find((o) => o.id === selectedId);
-  latest.current = { project, projects, page, selectedId, dialog };
+  const cards = project?.cards || [];
+  const selectedCard = cards.find((c) => c.id === selectedId);
+  latest.current = { project, projects, page, selectedId, dialog, pickCardId };
   const notify = useCallback((message, type = "success") => {
     clearTimeout(toastTimer.current);
     setToast({ message, type, id: Date.now() });
@@ -185,7 +203,73 @@ function StudioApp() {
   }
   function selectObject(id) {
     setSelectedId(id);
+    setPickCardId(null);
     if (id) setInspectorTab("object");
+  }
+  function selectCard(id) {
+    setSelectedId(id);
+    setInspectorTab("object");
+    setPlaying(false);
+    setTool("select");
+    if (pickCardId && pickCardId !== id) setPickCardId(null);
+  }
+  function addCard(type) {
+    const current = latest.current.project;
+    if (!current) return;
+    if ((current.cards || []).length >= MAX_CARDS) {
+      notify(`Keep each scene to ${MAX_CARDS} lesson boxes.`, "error");
+      return;
+    }
+    const card = newCard(type, current, latest.current.selectedId);
+    commit((p) => ({ ...p, cards: [...(p.cards || []), card] }));
+    selectCard(card.id);
+    setLibraryOpen(false);
+    if (window.matchMedia?.("(max-width: 1100px)").matches)
+      setInspectorOpen(true);
+    notify(`${CARD_TYPE_NAMES[type]} added. Write your explanation.`);
+  }
+  function updateCard(id, patch) {
+    commit((p) => ({
+      ...p,
+      cards: (p.cards || []).map((c) => {
+        if (c.id !== id) return c;
+        const next = validateCard(
+          { ...c, ...patch },
+          new Set(p.objects.map((o) => o.id)),
+        );
+        return next || c;
+      }),
+    }));
+  }
+  function duplicateCard() {
+    if (!selectedCard) return;
+    if (cards.length >= MAX_CARDS) {
+      notify(`Keep each scene to ${MAX_CARDS} lesson boxes.`, "error");
+      return;
+    }
+    const card = {
+      ...clone(selectedCard),
+      id: crypto.randomUUID(),
+      title: `${selectedCard.title} copy`.slice(0, 60),
+      position: [
+        Math.min(6, selectedCard.position[0] + 0.5),
+        Math.max(-0.5, selectedCard.position[1] - 0.5),
+        selectedCard.position[2],
+      ],
+    };
+    commit((p) => ({ ...p, cards: [...(p.cards || []), card] }));
+    selectCard(card.id);
+    notify("Lesson box duplicated.");
+  }
+  function pickPoint(objectId, point) {
+    const id = latest.current.pickCardId;
+    if (!id) return;
+    updateCard(id, { target: { objectId, point } });
+    setPickCardId(null);
+    const name = latest.current.project.objects.find(
+      (o) => o.id === objectId,
+    )?.name;
+    notify(`The box now points to ${name || "this model"}.`);
   }
   function addObject(assetId, position) {
     if (!ASSETS.some((a) => a.id === assetId)) return;
@@ -213,7 +297,20 @@ function StudioApp() {
   }
   function deleteObject(id = selectedId) {
     if (!id) return;
-    commit((p) => ({ ...p, objects: p.objects.filter((o) => o.id !== id) }));
+    if ((latest.current.project?.cards || []).some((c) => c.id === id)) {
+      commit((p) => ({ ...p, cards: p.cards.filter((c) => c.id !== id) }));
+      setSelectedId(null);
+      setPickCardId(null);
+      notify("Lesson box removed. Undo is always here.");
+      return;
+    }
+    commit((p) => ({
+      ...p,
+      objects: p.objects.filter((o) => o.id !== id),
+      cards: (p.cards || []).map((c) =>
+        c.target?.objectId === id ? { ...c, target: null } : c,
+      ),
+    }));
     setSelectedId(null);
     notify("Object removed. Undo is always here.");
   }
@@ -306,11 +403,19 @@ function StudioApp() {
       notify("This demo holds up to 30 projects.", "error");
       return;
     }
+    const ids = new Map(p.objects.map((o) => [o.id, crypto.randomUUID()]));
     const dup = {
       ...clone(p),
       id: crypto.randomUUID(),
       title: `${p.title} copy`.slice(0, 70),
-      objects: p.objects.map((o) => ({ ...clone(o), id: crypto.randomUUID() })),
+      objects: p.objects.map((o) => ({ ...clone(o), id: ids.get(o.id) })),
+      cards: (p.cards || []).map((c) => ({
+        ...clone(c),
+        id: crypto.randomUUID(),
+        target: c.target
+          ? { ...clone(c.target), objectId: ids.get(c.target.objectId) }
+          : null,
+      })),
       updatedAt: new Date().toISOString(),
     };
     setProjects((prev) => [dup, ...prev]);
@@ -376,6 +481,10 @@ function StudioApp() {
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         deleteObject(latest.current.selectedId);
+      }
+      if (e.key === "Escape" && latest.current.pickCardId) {
+        setPickCardId(null);
+        return;
       }
       if (e.key === "Escape") {
         setSelectedId(null);
@@ -589,6 +698,14 @@ function StudioApp() {
                   Objects<span>{ASSETS.length}</span>
                 </button>
                 <button
+                  className={libraryTab === "lesson" ? "active" : ""}
+                  onClick={() => setLibraryTab("lesson")}
+                >
+                  <BookOpen size={16} />
+                  Lesson
+                  {cards.length > 0 && <span>{cards.length}</span>}
+                </button>
+                <button
                   className={libraryTab === "markers" ? "active" : ""}
                   onClick={() => setLibraryTab("markers")}
                 >
@@ -596,7 +713,20 @@ function StudioApp() {
                   Markers
                 </button>
               </div>
-              {libraryTab === "objects" ? (
+              {libraryTab === "lesson" ? (
+                <LessonToolsPanel
+                  cards={cards}
+                  selectedId={selectedId}
+                  onAdd={addCard}
+                  onSelect={(id) => {
+                    selectCard(id);
+                    setLibraryOpen(false);
+                    if (window.matchMedia?.("(max-width: 1100px)").matches)
+                      setInspectorOpen(true);
+                  }}
+                  onSignIn={() => setDialog("signin")}
+                />
+              ) : libraryTab === "objects" ? (
                 <>
                   <label className="search-field">
                     <Search size={16} />
@@ -833,7 +963,21 @@ function StudioApp() {
                   grid={grid}
                   markerVisible={markerVisible}
                   playing={playing}
+                  cards={cards}
+                  cardMode="edit"
+                  onSelectCard={selectCard}
+                  onMoveCard={(id, position) => updateCard(id, { position })}
+                  pickMode={pickCardId}
+                  onPickPoint={pickPoint}
                 />
+                {pickCardId && (
+                  <div className="pick-banner" role="status">
+                    <span>
+                      Click the part of the model this box should point to.
+                    </span>
+                    <button onClick={() => setPickCardId(null)}>Cancel</button>
+                  </div>
+                )}
                 <div className="canvas-greeting">
                   <span className="eyebrow">
                     DREAM IT. BUILD IT. BRING IT TO LIFE.
@@ -974,19 +1118,39 @@ function StudioApp() {
                   onClick={() => setInspectorTab("object")}
                 >
                   <SlidersHorizontal size={14} />
-                  Object
+                  {selectedCard ? "Lesson box" : "Object"}
                 </button>
                 <button
                   className={inspectorTab === "scene" ? "active" : ""}
                   onClick={() => setInspectorTab("scene")}
                 >
                   <Layers size={14} />
-                  Scene<span>{project.objects.length}</span>
+                  Scene<span>{project.objects.length + cards.length}</span>
                 </button>
               </div>
               <div className="inspector-scroll">
                 {inspectorTab === "object" ? (
-                  selected ? (
+                  selectedCard ? (
+                    <CardProperties
+                      key={selectedCard.id}
+                      card={selectedCard}
+                      objects={project.objects}
+                      update={(patch) => updateCard(selectedCard.id, patch)}
+                      onDelete={() => deleteObject(selectedCard.id)}
+                      onDuplicate={duplicateCard}
+                      picking={pickCardId === selectedCard.id}
+                      onPick={() => {
+                        const next =
+                          pickCardId === selectedCard.id
+                            ? null
+                            : selectedCard.id;
+                        setPickCardId(next);
+                        if (next) setInspectorOpen(false);
+                      }}
+                      onSignIn={() => setDialog("signin")}
+                      notify={notify}
+                    />
+                  ) : selected ? (
                     <ObjectProperties
                       object={selected}
                       update={(patch) => updateObject(selected.id, patch)}
@@ -1017,6 +1181,8 @@ function StudioApp() {
                   <SceneObjects
                     project={project}
                     selectedId={selectedId}
+                    onSelectCard={selectCard}
+                    updateCard={updateCard}
                     onSelect={selectObject}
                     updateObject={updateObject}
                     onDelete={deleteObject}
@@ -1030,9 +1196,11 @@ function StudioApp() {
                 <div>
                   <strong>A little tip</strong>
                   <p>
-                    {selected?.assetId === "earth"
-                      ? "Try a slow spin. Even little worlds love to turn."
-                      : "Give an object a float or a spin, then press Play to see it move."}
+                    {selectedCard
+                      ? "Use Point to a model part, then drag the box to a clear space."
+                      : selected?.assetId === "earth"
+                        ? "Try a slow spin. Even little worlds love to turn."
+                        : "Give an object a float or a spin, then press Play to see it move."}
                   </p>
                 </div>
               </div>
@@ -1047,7 +1215,12 @@ function StudioApp() {
             </span>
             <span>
               <ShieldCheck size={12} />
-              No login. Just imagination.<i>·</i>
+              {teacher
+                ? `Teacher: ${teacher.user.email}`
+                : cloudEnabled()
+                  ? "Sign in only for media uploads"
+                  : "No login. Just imagination."}
+              <i>·</i>
               <span>Demo workspace</span>
             </span>
             <button onClick={() => setDialog("help")}>
@@ -1111,6 +1284,9 @@ function StudioApp() {
           printFirst={dialog === "print"}
         />
       )}
+      {dialog === "signin" && (
+        <TeacherSignIn onClose={() => setDialog(null)} notify={notify} />
+      )}
       {dialog === "preview" && (
         <Modal
           label="Interactive 3D preview"
@@ -1125,7 +1301,20 @@ function StudioApp() {
             <p>Drag to look around. Your animations are playing.</p>
           </div>
           <div className="preview-canvas">
-            <StudioCanvas project={project} viewOnly playing grid={false} />
+            <StudioCanvas
+              project={project}
+              viewOnly
+              playing
+              grid={false}
+              cards={cards}
+              onOpenCard={setPreviewCard}
+            />
+            {previewCard && (
+              <LessonCardSheet
+                card={previewCard}
+                onClose={() => setPreviewCard(null)}
+              />
+            )}
           </div>
           <div className="preview-modal-footer">
             <span>
@@ -1425,9 +1614,12 @@ function SceneObjects({
   project,
   selectedId,
   onSelect,
+  onSelectCard,
+  updateCard,
   updateObject,
   onDelete,
 }) {
+  const cards = project.cards || [];
   return (
     <div className="scene-object-panel">
       <div className="scene-list-heading">
@@ -1480,6 +1672,53 @@ function SceneObjects({
         <EmptyState icon={Box} title="A world waiting to happen">
           Add your first object from the toolbox.
         </EmptyState>
+      )}
+      {cards.length > 0 && (
+        <>
+          <div className="scene-list-heading lesson-list-heading">
+            <span>LESSON BOXES</span>
+            <strong>
+              {cards.length}/{MAX_CARDS}
+            </strong>
+          </div>
+          {cards.map((c) => {
+            const Icon = CARD_ICONS[c.type];
+            return (
+              <div
+                className={`scene-object ${c.id === selectedId ? "active" : ""} ${c.visible ? "" : "object-hidden"}`}
+                key={c.id}
+              >
+                <button
+                  className="scene-object-select"
+                  onClick={() => onSelectCard(c.id)}
+                >
+                  <span
+                    className="scene-card-icon"
+                    style={{ "--card-color": c.color }}
+                  >
+                    <Icon size={15} />
+                  </span>
+                  <span>
+                    <strong>{c.title || "Untitled box"}</strong>
+                    <small>{CARD_TYPE_NAMES[c.type]}</small>
+                  </span>
+                </button>
+                <IconButton
+                  label={`${c.visible ? "Hide" : "Show"} ${c.title || "box"}`}
+                  onClick={() => updateCard(c.id, { visible: !c.visible })}
+                >
+                  {c.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                </IconButton>
+                <IconButton
+                  label={`Remove ${c.title || "box"}`}
+                  onClick={() => onDelete(c.id)}
+                >
+                  <Trash2 size={13} />
+                </IconButton>
+              </div>
+            );
+          })}
+        </>
       )}
       <div className="scene-marker-note">
         <img
