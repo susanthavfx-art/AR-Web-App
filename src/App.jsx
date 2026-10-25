@@ -67,7 +67,6 @@ import {
 } from "lucide-react";
 import StudioCanvas from "./components/StudioCanvas";
 import AssetImage from "./components/AssetImage";
-import ModelLibraryGuide from "./components/ModelLibraryGuide";
 import Viewer from "./components/Viewer";
 import PrintPage from "./components/PrintPage";
 import ShareModal from "./components/ShareModal";
@@ -630,22 +629,12 @@ function StudioApp() {
                       </button>
                     ))}
                   </div>
-                  <div className="library-model-tools">
-                    <button onClick={() => setDialog("models")}>
-                      <Plus size={14} />
-                      <span>Add your own models</span>
-                      <ArrowUpRight size={13} />
-                    </button>
-                    {catalogue.warnings.length > 0 && (
-                      <button
-                        className="catalogue-notice"
-                        onClick={() => setDialog("models")}
-                      >
-                        Catalogue needs attention · {catalogue.warnings.length}{" "}
-                        {catalogue.warnings.length === 1 ? "issue" : "issues"}
-                      </button>
-                    )}
-                  </div>
+                  {catalogue.warnings.length > 0 && (
+                    <p className="catalogue-notice" role="status">
+                      Some library items are unavailable. Refresh the page or
+                      ask your library provider for help.
+                    </p>
+                  )}
                   <div className="library-scroll">
                     <div className="library-section-label">
                       <span>
@@ -653,7 +642,10 @@ function StudioApp() {
                           ? "BIG IDEAS START SMALL"
                           : `${category.toUpperCase()} DISCOVERIES`}
                       </span>
-                      <span>{assets.length} objects</span>
+                      <span>
+                        {assets.length}{" "}
+                        {assets.length === 1 ? "object" : "objects"}
+                      </span>
                     </div>
                     {assets.length ? (
                       <div className="asset-grid">
@@ -1158,15 +1150,6 @@ function StudioApp() {
           }}
         />
       )}
-      {dialog === "models" && (
-        <Modal
-          className="models-guide"
-          label="Add your own models"
-          onClose={() => setDialog(null)}
-        >
-          <ModelLibraryGuide />
-        </Modal>
-      )}
       {dialog === "about" && (
         <Modal
           className="about-modal"
@@ -1214,19 +1197,11 @@ function StudioApp() {
             </div>
           </div>
           <p className="small-note">
-            Included: 12 original procedural demo models, {catalogue.count}{" "}
-            hosted GLB {catalogue.count === 1 ? "model" : "models"}, two
-            AI-illustrated markers and real MindAR image tracking. Add more GLBs
-            through the GitHub catalogue. Cloud classrooms and accounts are
-            future work.
+            Included: 12 built-in models and {catalogue.count} additional
+            library {catalogue.count === 1 ? "model" : "models"}, with two
+            illustrated tracking markers. Choose from the provided library,
+            build a lesson, then publish a snapshot and print its marker.
           </p>
-          <button
-            className="button secondary full"
-            onClick={() => setDialog("models")}
-          >
-            <Plus size={15} />
-            Add your own models
-          </button>
           {project && (
             <button
               className="button primary full"
