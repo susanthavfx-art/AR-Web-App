@@ -41,6 +41,10 @@ jobs:
         run: npm run build
         env:
           VITE_BASE_PATH: "${{ steps.pages.outputs.base_path }}/"
+          # Optional teacher media uploads and short lesson links.
+          # Set these in Settings > Secrets and variables > Actions > Variables.
+          VITE_SUPABASE_URL: "${{ vars.SUPABASE_URL }}"
+          VITE_SUPABASE_PUBLISHABLE_KEY: "${{ vars.SUPABASE_PUBLISHABLE_KEY }}"
 
       - name: Disable Jekyll processing
         run: touch site/.nojekyll
