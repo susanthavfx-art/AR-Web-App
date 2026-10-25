@@ -1,0 +1,37 @@
+# Third-party notices and demo asset provenance
+
+## Bundled tracking runtime
+
+The browser bundles in `src/vendor/` are from **MindAR 1.2.5** by hiukim and contributors, originally distributed at https://github.com/hiukim/mind-ar-js and via the `mind-ar` npm package. The upstream MIT licence is included as `src/vendor/LICENSE.mind-ar`.
+
+Bundled TensorFlow.js code retains its Apache 2.0 licence comments. Other embedded third-party notices in the distributed bundles are retained. See the upstream project and dependency source for their complete licence materials.
+
+Three small local browser-only adaptations are made to the distributed bundles:
+
+1. Save the bound resize handler as `_boundResize` so the viewer can remove it on exit.
+2. Forward errors from the asynchronous AR setup into the outer promise rather than leaving it unresolved.
+3. Replace the unreachable Node-only `node-fetch` fallback reference with the browser's global fetch to avoid Vite scanning an unneeded server dependency.
+
+The viewer supplies its own camera-start wrapper to preserve permission errors, handle cancellation and stop pending streams safely. It cleans up rendering and tracking on exit. These changes do not replace the marker detector with simulated tracking.
+
+## Fonts
+
+- DM Sans — Google Fonts, SIL Open Font License 1.1. See `public/fonts/dm-sans-OFL.txt`.
+- Plus Jakarta Sans — Google Fonts, SIL Open Font License 1.1. See `public/fonts/jakarta-OFL.txt`.
+
+Fonts are self-hosted. No Google Fonts request occurs at app runtime.
+
+## Other application dependencies
+
+React, React DOM, Three.js, Lucide React, LZ-String, node-qrcode, jsPDF, Vite and its React plugin are installed through npm. Their licences remain in their npm packages and are recorded in `package-lock.json`. jsPDF's optional internal HTML-related dependencies are bundled by the package, but this app generates PDFs with explicit drawing, image and text APIs, not untrusted HTML.
+
+Playwright, Sharp and Prettier are development tools. They are not used for tracking on the user's phone.
+
+## Original demo assets
+
+- The twelve demo 3D models are built procedurally in `src/lib/assets.js` for this prototype; they are not downloaded from Assemblr or a third-party model catalogue.
+- `public/markers/space-explorer.jpg` and `forest-friends.jpg` are AI-generated original demo illustrations created for this app. They are not photographs or reproductions of Assemblr content. Usage is subject to applicable image-generation/platform terms.
+- The full-quality PNG originals are in `design-assets/marker-originals/`. Optimised runtime JPEGs are in `public/markers/`. Their `.mind` files were compiled from those exact runtime JPEGs using MindAR's browser compiler.
+- Wonderlab's interface and logo in this prototype are newly created for this task.
+
+No affiliation with Assemblr is claimed. Production branding and content licensing should be reviewed before commercial release.
