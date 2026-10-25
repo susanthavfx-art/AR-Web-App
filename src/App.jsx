@@ -66,6 +66,8 @@ import {
   X,
 } from "lucide-react";
 import StudioCanvas from "./components/StudioCanvas";
+import AssetImage from "./components/AssetImage";
+import ModelLibraryGuide from "./components/ModelLibraryGuide";
 import Viewer from "./components/Viewer";
 import PrintPage from "./components/PrintPage";
 import ShareModal from "./components/ShareModal";
@@ -73,7 +75,7 @@ import { EmptyState, IconButton, Logo, Modal } from "./components/UI";
 import {
   ASSETS,
   MARKERS,
-  assetThumbnail,
+  catalogue,
   getAsset,
   getMarker,
   sceneObject,
@@ -615,7 +617,9 @@ function StudioApp() {
                     )}
                   </label>
                   <div className="category-tabs" aria-label="Object categories">
-                    {["All", "Space", "Nature", "Science"].map((c) => (
+                    {[
+                      ...new Set(["All", ...ASSETS.map((a) => a.category)]),
+                    ].map((c) => (
                       <button
                         key={c}
                         className={category === c ? "active" : ""}
@@ -625,6 +629,22 @@ function StudioApp() {
                         {c}
                       </button>
                     ))}
+                  </div>
+                  <div className="library-model-tools">
+                    <button onClick={() => setDialog("models")}>
+                      <Plus size={14} />
+                      <span>Add your own models</span>
+                      <ArrowUpRight size={13} />
+                    </button>
+                    {catalogue.warnings.length > 0 && (
+                      <button
+                        className="catalogue-notice"
+                        onClick={() => setDialog("models")}
+                      >
+                        Catalogue needs attention · {catalogue.warnings.length}{" "}
+                        {catalogue.warnings.length === 1 ? "issue" : "issues"}
+                      </button>
+                    )}
                   </div>
                   <div className="library-scroll">
                     <div className="library-section-label">
@@ -654,11 +674,14 @@ function StudioApp() {
                               className="asset-art"
                               style={{ background: a.bg }}
                             >
-                              <img
-                                src={assetThumbnail(a.id)}
+                              <AssetImage
+                                assetId={a.id}
                                 alt=""
                                 draggable={false}
                               />
+                              {a.kind === "glb" && (
+                                <span className="asset-filetype">GLB</span>
+                              )}
                               <span className="asset-add">
                                 <Plus size={14} />
                               </span>
@@ -1135,6 +1158,15 @@ function StudioApp() {
           }}
         />
       )}
+      {dialog === "models" && (
+        <Modal
+          className="models-guide"
+          label="Add your own models"
+          onClose={() => setDialog(null)}
+        >
+          <ModelLibraryGuide />
+        </Modal>
+      )}
       {dialog === "about" && (
         <Modal
           className="about-modal"
@@ -1182,10 +1214,19 @@ function StudioApp() {
             </div>
           </div>
           <p className="small-note">
-            Included: 12 original procedural demo models, two AI-illustrated
-            markers and real MindAR image tracking. Cloud classrooms, custom
-            asset uploads and accounts are future work.
+            Included: 12 original procedural demo models, {catalogue.count}{" "}
+            hosted GLB {catalogue.count === 1 ? "model" : "models"}, two
+            AI-illustrated markers and real MindAR image tracking. Add more GLBs
+            through the GitHub catalogue. Cloud classrooms and accounts are
+            future work.
           </p>
+          <button
+            className="button secondary full"
+            onClick={() => setDialog("models")}
+          >
+            <Plus size={15} />
+            Add your own models
+          </button>
           {project && (
             <button
               className="button primary full"
@@ -1232,7 +1273,7 @@ function StudioApp() {
   );
 }
 function ObjectProperties({ object, update, onDelete, onDuplicate }) {
-  const a = getAsset(object.assetId);
+  const a = getAsset(object.assetId, object.model);
   function vector(field, i, value) {
     if (value === "") return;
     const num = Number(value);
@@ -1249,7 +1290,7 @@ function ObjectProperties({ object, update, onDelete, onDuplicate }) {
     <>
       <div className="selected-object-card">
         <span className="selected-object-art" style={{ background: a.bg }}>
-          <img src={assetThumbnail(a.id)} alt="" />
+          <AssetImage assetId={a.id} model={object.model} alt="" />
         </span>
         <div>
           <span>{a.category.toUpperCase()} OBJECT</span>
@@ -1430,15 +1471,16 @@ function SceneObjects({
               className="scene-object-select"
               onClick={() => onSelect(o.id)}
             >
-              <img
-                src={assetThumbnail(o.assetId)}
+              <AssetImage
+                assetId={o.assetId}
+                model={o.model}
                 alt=""
-                style={{ background: getAsset(o.assetId).bg }}
+                style={{ background: getAsset(o.assetId, o.model).bg }}
               />
               <span>
                 <strong>{o.name}</strong>
                 <small>
-                  {getAsset(o.assetId).category}
+                  {getAsset(o.assetId, o.model).category}
                   {o.animation !== "none" ? ` · ${o.animation}` : ""}
                 </small>
               </span>
@@ -1492,10 +1534,11 @@ function ProjectArt({ objects, color = "#ede8fa" }) {
         objects
           .slice(0, 3)
           .map((o, i) => (
-            <img
+            <AssetImage
               className={`art-object art-object-${i}`}
               key={i}
-              src={assetThumbnail(o.assetId)}
+              assetId={o.assetId}
+              model={o.model}
               alt=""
             />
           ))
@@ -1704,7 +1747,7 @@ function TemplatesPage({ onCreate, onBack }) {
         </div>
         <div className="templates-hero-art">
           <span className="hero-circle" />
-          <img src={assetThumbnail("rocket")} alt="A playful 3D rocket" />
+          <AssetImage assetId="rocket" alt="A playful 3D rocket" />
           <span className="hero-star hero-star-1">✦</span>
           <span className="hero-star hero-star-2">✧</span>
           <span className="hero-orbit" />
