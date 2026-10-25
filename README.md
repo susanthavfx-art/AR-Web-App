@@ -1,5 +1,7 @@
 # Wonderlab — WebAR creation studio
 
+> **Lesson boxes update:** Teachers can add **Text, Audio (voice recording/upload), Video and Link boxes** beside models, point them to model parts and publish them to the viewer and phone AR. Audio/video uploads and short QR links use an optional Supabase project. See [LESSON-BOXES.md](LESSON-BOXES.md).
+
 > **Teacher-library update:** Teachers use the owner-provided library and publish scene snapshots. Model-owner buttons/GitHub instructions are not shown in the teacher UI. Wonder Bot is in Science; the owner-provided Velociraptor remains in Animals. See [TEACHER-LIBRARY.md](TEACHER-LIBRARY.md) for installing the patch and adding categories without JavaScript edits.
 
 > **GitHub Pages update:** See [GITHUB-PAGES-SETUP.md](GITHUB-PAGES-SETUP.md) for deploying this repository at `/AR-Web-App/`. The included workflow builds the app and publishes `site/`, not the source repository.
