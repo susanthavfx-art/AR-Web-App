@@ -14,6 +14,7 @@ import {
   addLights,
   disposeGroup,
   getMarker,
+  tickModel,
 } from "../lib/assets";
 
 const StudioCanvas = forwardRef(function StudioCanvas(
@@ -35,7 +36,8 @@ const StudioCanvas = forwardRef(function StudioCanvas(
   const host = useRef(null),
     engine = useRef(null),
     props = useRef({}),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [modelSummary, setModelSummary] = useState({ loading: 0, errors: [] });
   props.current = {
     project,
     selectedId,
@@ -351,6 +353,7 @@ const StudioCanvas = forwardRef(function StudioCanvas(
       frame = requestAnimationFrame(loop);
       const now = performance.now();
       if (document.hidden || now - lastFrame < 32) return;
+      const delta = (now - lastFrame) / 1000;
       lastFrame = now;
       const t = (now - start) / 1000;
       controls.update();
@@ -360,6 +363,7 @@ const StudioCanvas = forwardRef(function StudioCanvas(
         p.project.objects.forEach((o, i) => {
           const m = models.get(o.id)?.group;
           if (!m) return;
+          if (m.visible) tickModel(m, delta);
           m.position.y =
             o.position[1] +
             (o.animation === "float" ? Math.sin(t * 1.6 + i) * 0.12 : 0);
@@ -400,6 +404,18 @@ const StudioCanvas = forwardRef(function StudioCanvas(
   useEffect(() => {
     const e = engine.current;
     if (!e) return;
+    const refreshModels = () => {
+      if (engine.current !== e) return;
+      const visible = [...e.models.values()].filter((m) => m.group.visible);
+      setModelSummary({
+        loading: visible.filter((m) => m.group.userData.loading).length,
+        errors: [
+          ...new Set(
+            visible.map((m) => m.group.userData.loadError).filter(Boolean),
+          ),
+        ],
+      });
+    };
     const ids = new Set(project.objects.map((o) => o.id));
     for (const [id, m] of e.models) {
       if (!ids.has(id)) {
@@ -411,7 +427,7 @@ const StudioCanvas = forwardRef(function StudioCanvas(
     }
     for (const object of project.objects) {
       let m = e.models.get(object.id);
-      const key = `${object.assetId}-${object.color || ""}`;
+      const key = `${object.assetId}-${object.color || ""}-${JSON.stringify(object.model || null)}`;
       if (m && m.key !== key) {
         e.transform.detach();
         e.scene.remove(m.group);
@@ -420,12 +436,24 @@ const StudioCanvas = forwardRef(function StudioCanvas(
         m = null;
       }
       if (!m) {
-        m = { key, group: createAsset(object.assetId, object.color) };
+        m = {
+          key,
+          group: createAsset(object.assetId, object.color, object.model),
+        };
         e.models.set(object.id, m);
         e.scene.add(m.group);
+        const current = m;
+        m.group.userData.ready?.then(() => {
+          if (engine.current !== e || e.models.get(object.id) !== current)
+            return;
+          e.renderer.shadowMap.needsUpdate = true;
+          e.requestRender();
+          refreshModels();
+        });
       }
       if (!e.dragging) applyObjectTransform(m.group, object);
     }
+    refreshModels();
     const selected = e.models.get(selectedId)?.group;
     if (selected && tool !== "select" && !viewOnly && !playing) {
       e.transform.attach(selected);
@@ -473,6 +501,26 @@ const StudioCanvas = forwardRef(function StudioCanvas(
   }, [project.markerId]);
   return (
     <div ref={host} className="studio-canvas" data-testid="studio-canvas">
+      {(modelSummary.loading > 0 || modelSummary.errors.length > 0) &&
+        !error && (
+          <div
+            className={`model-load-note ${modelSummary.errors.length ? "has-error" : ""}`}
+            role="status"
+          >
+            {modelSummary.loading > 0 && (
+              <span>
+                Loading{" "}
+                {modelSummary.loading === 1
+                  ? "your model"
+                  : `${modelSummary.loading} models`}
+                …
+              </span>
+            )}
+            {modelSummary.errors.map((message) => (
+              <p key={message}>{message}</p>
+            ))}
+          </div>
+        )}
       {error && (
         <div className="webgl-error">
           <strong>Let’s get 3D working</strong>

@@ -27,6 +27,7 @@ import {
   createAsset,
   disposeGroup,
   getMarker,
+  tickModel,
 } from "../lib/assets";
 import { markerPdf } from "../lib/pdf";
 
@@ -187,10 +188,26 @@ function ViewerExperience({ project }) {
         content.current = contentGroup;
         anchor.group.add(contentGroup);
         project.objects.forEach((o) => {
-          const model = createAsset(o.assetId, o.color);
+          const model = createAsset(o.assetId, o.color, o.model);
           applyObjectTransform(model, o);
           contentGroup.add(model);
         });
+        if (contentGroup.children.some((model) => model.userData.loading))
+          setLoading("Loading your 3D models…");
+        await Promise.all(
+          contentGroup.children.map((model) => model.userData.ready),
+        );
+        if (disposed) {
+          cleanup();
+          return;
+        }
+        const failedModel = contentGroup.children.find(
+          (model) => model.visible && model.userData.loadError,
+        );
+        if (failedModel)
+          throw new Error(
+            `A 3D model could not load: ${failedModel.userData.loadError}`,
+          );
         anchor.onTargetFound = () => {
           if (!disposed) setTracking(true);
         };
@@ -219,11 +236,16 @@ function ViewerExperience({ project }) {
         setReady(true);
         setLoading("");
         const startTime = performance.now();
+        let lastTime = startTime;
         mindar.renderer.setAnimationLoop(() => {
           if (disposed) return;
-          const t = (performance.now() - startTime) / 1000;
+          const now = performance.now(),
+            delta = (now - lastTime) / 1000;
+          lastTime = now;
+          const t = (now - startTime) / 1000;
           project.objects.forEach((o, i) => {
             const model = contentGroup.children[i];
+            if (model.visible) tickModel(model, delta);
             if (o.animation === "float")
               model.position.y = o.position[1] + Math.sin(t * 1.6 + i) * 0.12;
             if (o.animation === "spin")
