@@ -35,3 +35,11 @@ Playwright, Sharp and Prettier are development tools. They are not used for trac
 - Wonderlab's interface and logo in this prototype are newly created for this task.
 
 No affiliation with Assemblr is claimed. Production branding and content licensing should be reviewed before commercial release.
+
+## GLB model support update
+
+- `public/models/wonder-bot.glb` is an original model made for Wonderlab, generated from mesh primitives by `scripts/create-sample-model.mjs`. It contains one original looping arm animation and no downloaded model or texture.
+- The four tiny models under `tests/fixtures/` are original generated boxes/a skinned stem for compression, embedded-texture and animation tests. They are not a user content catalogue. `scripts/create-test-models.mjs` rebuilds them. The generator uses the pinned Three-distributed Draco encoder and downloads a pinned Meshopt encoder module for development only; neither encoder is requested by the application at runtime.
+- `public/vendor/draco/` contains the unmodified glTF decoder files copied from `three@0.160.1`'s `examples/jsm/libs/draco/gltf/` distribution. Draco is by Google and contributors, under the Apache License 2.0 and included upstream third-party notices; see `public/vendor/draco/LICENSE.draco.txt`. The Three.js distribution licence is retained as `LICENSE.three.txt`. Draco's upstream project is https://github.com/google/draco.
+- GLTFLoader, DRACOLoader and SkeletonUtils come from the pinned Three.js npm package. The Meshopt decoder is imported from Three's `examples/jsm/libs/meshopt_decoder.module.js`, whose upstream licence comments are retained in the bundled distribution. Meshoptimizer is by Arseny Kapoulkine and contributors, under the MIT licence.
+- User-added GLBs, textures and thumbnails are not licensed by the application. The repository owner must have publication rights and retain any required attribution/licence materials. Catalogue `credit` is metadata, not a licence grant or automatic compliance review.

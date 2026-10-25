@@ -2,9 +2,11 @@
 
 > **GitHub Pages update:** See [GITHUB-PAGES-SETUP.md](GITHUB-PAGES-SETUP.md) for deploying this repository at `/AR-Web-App/`. The included workflow builds the app and publishes `site/`, not the source repository.
 
+> **GLB library update:** Add your own models through `public/models/catalog.json`. Start with [ADD-MODELS.md](ADD-MODELS.md); one-time patch installation is in [UPDATE-MODEL-LIBRARY.md](UPDATE-MODEL-LIBRARY.md). No backend or JavaScript edits are needed for future catalogue additions.
+
 **A little imagination. A whole new world.**
 
-A working, child-friendly MVP of a marker-based WebAR authoring platform. Build a 3D scene from a demo object library, arrange and animate it, share a self-contained project link, print a marker sheet, and view the scene through a phone camera.
+A working, child-friendly MVP of a marker-based WebAR authoring platform. Build a 3D scene from demo objects and repository-hosted GLB models, arrange and animate it, share a scene-snapshot link, print a marker sheet, and view the scene through a phone camera. Snapshot links carry the scene/model definitions, not the hosted GLB binaries.
 
 ![Wonderlab creation studio](docs/studio-preview.png)
 
@@ -31,7 +33,7 @@ AR needs an accessible **HTTPS** URL, camera permission, WebGL and a compatible 
 | Area | Features |
 | --- | --- |
 | 3D authoring | Orbit/zoom, click selection, drag-and-drop placement, move/rotate/uniform-scale handles, numerical transforms, colours, duplicate/delete, undo/redo |
-| Object library | 12 original procedural demo models: rocket, Earth, Saturn, Moon, Sun, astronaut, tree, mushroom, robot, atom, volcano and flower |
+| Object library | 12 original procedural demo models plus an original animated Wonder Bot GLB; extend with `public/models/catalog.json`, automatic categories/thumbnails, base-aware loading, GLB animation and loading/error states |
 | Markers | Two AI-illustrated image markers, with matching precompiled MindAR `.mind` target files |
 | Scene management | Named objects, object visibility, scene list, float/spin animations, grid and marker guide |
 | Projects | Local autosave, reopen, rename, duplicate, search, delete, JSON export/import, four starting templates |
@@ -45,9 +47,9 @@ AR needs an accessible **HTTPS** URL, camera permission, WebGL and a compatible 
 
 - **No backend, login, student profiles, classroom management or teacher/admin roles.** Nothing is pretending to authenticate or upload a project.
 - Projects are saved in **this browser on this device** using local storage. Clearing site data can remove them. Private browsing or full storage may prevent saving. Export JSON to keep a backup.
-- Anyone with a snapshot link can view the included scene. Links are **not private, revocable, password protected or permanent hosted records**. Editing a project does not change an old link; create and share a new snapshot.
+- Anyone with a snapshot link can view the included scene. Model files are public hosted assets, not private uploads. A scene snapshot preserves file paths and model settings, not an immutable copy of a GLB; replacing/deleting a referenced file changes/breaks old shares. Links are **not private, revocable, password protected or permanent hosted records**. Editing a project does not change an old link; create and share a new snapshot.
 - The demo permits **20 objects per scene and 30 local projects** to keep URLs and mobile workloads reasonable. Even within this limit, performance varies by phone.
-- The library contains procedural demo models. **Custom GLB/GLTF uploads and an admin library uploader are not implemented yet.** Your existing models and markers can be integrated in a follow-up phase.
+- **Custom GLB models are supported through GitHub files + a JSON catalogue.** Upload self-contained GLB 2.0 files under `public/models/` and list them in `catalog.json`; see [ADD-MODELS.md](ADD-MODELS.md). There is no in-app/admin file uploader or cloud storage. Standalone `.gltf` files, external texture files and KTX2 textures are not supported. Keep model files online for old links. The loader supports Draco/Meshopt geometry and rejects GLBs larger than 40 MiB; mobile optimisation is still necessary.
 - The two bundled image targets are compiled in advance. Selecting them does not require runtime compilation. Arbitrary user-uploaded images would need a target-compilation workflow.
 - The editor's platform, orbit lines and grid are authoring aids; they do not appear in the real AR scene.
 - Camera tracking runs on the device; the app does not upload the camera feed or include analytics. Ordinary hosting access logs are still the responsibility of the deployment provider.
@@ -80,7 +82,7 @@ The GitHub Pages workflow in `.github/workflows/static.yml` installs dependencie
 
 Full-quality illustration originals are kept in `design-assets/marker-originals/`; the app uses optimised JPEGs compiled into the matching tracking targets.
 
-There are no runtime CDN dependencies: fonts, marker images and tracking bundles are local. npm needs network access at install time. The 3D editor and AR viewer require JavaScript and WebGL; there is no offline/service-worker guarantee.
+There are no runtime CDN dependencies: fonts, marker images, tracking bundles, Draco decoders and the example GLB are local. Meshopt decoding is bundled with Three.js. For large catalogues, provide image thumbnails so opening the library does not require downloading every GLB; automatic GLB thumbnails are lazy and load at most two distinct files concurrently. npm needs network access at install time. The 3D editor and AR viewer require JavaScript and WebGL; there is no offline/service-worker guarantee.
 
 For production, replace the permissive development-host setting with normal deployment controls. A content-security policy must allow the local scripts/assets and MindAR's blob worker; camera permission must be allowed for the top-level viewer. Prefer opening the viewer directly rather than loosening an unrelated iframe's permissions.
 
@@ -88,28 +90,36 @@ For production, replace the permissive development-host setting with normal depl
 
 ```text
 src/
-  App.jsx                       Editor, project management, templates and guide
+  App.jsx                       Editor, project management, templates and guides
   components/
-    StudioCanvas.jsx            Three.js workspace, orbit and transform controls
+    AssetImage.jsx              Reactive/lazy procedural or GLB thumbnails
+    ModelLibraryGuide.jsx       In-app GitHub catalogue instructions
+    StudioCanvas.jsx            Three.js workspace, GLBs, orbit and transform controls
     Viewer.jsx                  Published viewer and real MindAR camera tracking
     ShareModal.jsx              Snapshot link, QR and marker publishing flow
     PrintPage.jsx               Printable marker page
     UI.jsx                      Shared branding, modal and controls
   lib/
-    assets.js                   Procedural model registry and marker metadata
+    assets.js                   Demo/GLB registry, instances and thumbnail cache
+    model-library.js            Catalogue validation, GLTFLoader, fitting and animation
     projects.js                 Validation, local persistence and scene encoding
     pdf.js                      Project-specific A4 marker PDF generation
   vendor/                       Pinned MindAR 1.2.5 browser bundles and licence
 public/
+  models/                       Editable catalog.json + original wonder-bot.glb sample
+  vendor/draco/                 Self-hosted Draco decoders and licence notices
   markers/                      Optimised marker JPEGs and matching .mind files
   fonts/                        Self-hosted fonts and OFL notices
 scripts/
   compile-targets.html/.mjs      Rebuild the two .mind files from the JPEGs
+  create-sample-model.mjs       Rebuild the original animated sample GLB
+  create-test-models.mjs         Rebuild original GLB test fixtures (development)
+  serve-pages.mjs               Strict subfolder host without SPA fallback
   screenshot.mjs                Desktop preview capture
   check-ar.mjs                  Synthetic-camera tracking smoke test
 ```
 
-The shared schema only accepts allowlisted demo asset IDs, bounded finite transforms, known animations and safe colour values. Imported JSON is validated and capped in size. Scene data is encoded as compact JSON with LZ-String in the URL fragment; no project lookup API is needed for the demo. The viewer maps editor X/Z coordinates to the image plane and editor Y to height above the marker.
+The shared schema accepts known demo IDs and validated `model:<id>` definitions, bounded finite transforms, known scene animations and safe colour values. Model filenames must be relative paths inside the model folder; absolute URLs and traversal are rejected. Imported JSON is validated and capped in size. New v2 scene links use stable string IDs and deduplicated model descriptors, including per-object descriptor references when settings differ; old numeric-index v1 links remain readable. Scene data is compressed with LZ-String in the URL fragment; no project lookup API is needed. The viewer maps editor X/Z coordinates to the image plane and editor Y to height above the marker.
 
 The studio renders on demand when still, limits animated rendering to about 30 FPS and caps pixel ratio. This avoids continuously redrawing an idle scene, especially on lower-powered devices. The tracking runtime itself has its own processing loop.
 
@@ -132,17 +142,24 @@ npx playwright install --with-deps chromium
 npm test
 ```
 
-The final complete production-build run passed all **6 tests**. Details are in [docs/VERIFICATION.md](docs/VERIFICATION.md).
+The final GLB-feature production-build suite passed **18 tests** against the strict `/AR-Web-App/` static server (no SPA fallback). See [docs/GLB-LIBRARY-VERIFICATION.md](docs/GLB-LIBRARY-VERIFICATION.md) for the exact scope and results. Earlier MVP and Pages-only records are preserved as historical verification.
 
-For the GitHub Pages subfolder verification, use the commands in [GITHUB-PAGES-SETUP.md](GITHUB-PAGES-SETUP.md). The updated suite passed **7 tests** against a strict `/AR-Web-App/` deployment without SPA fallback.
+To reproduce the strict production test:
 
-The included end-to-end tests cover editing and local persistence; project templates and backups; snapshot sharing to a fresh browser context; PDF download and print rendering; camera-denied fallback; mobile drawers; malformed links; and **actual MindAR detection against each bundled marker using a synthetic camera stream**, including camera shutdown on exit.
+```bash
+VITE_BASE_PATH=/AR-Web-App/ npm run build
+node scripts/serve-pages.mjs
+# In a second terminal:
+APP_BASE_PATH=/AR-Web-App/ npx playwright test
+```
+
+The suite covers catalogue loading/validation/fallback; automatic thumbnails; GLB transforms, saved projects, backups and embedded animation; stable/fresh-phone shares even after catalogue reorder or outage; distinct model definitions in one scene; legacy v1 links; delayed-load disposal and request caching; original Draco/Meshopt/textured/skinned fixtures; and all previous editor, mobile, PDF, routing and camera flows. It runs **actual MindAR detection against each bundled marker using a synthetic camera stream**; the Space explorer scene also includes the animated GLB. Camera tracks are checked after exit.
 
 A synthetic stream exercises real detection and rendering code, but **does not replace physical iPhone/Android testing**. Before classroom use, verify rear-camera selection, permissions, target reacquisition, different viewing angles, lighting, print quality, performance and battery/thermal behaviour on the intended devices.
 
 ## Next production phase
 
-1. Integrate your actual marker/object catalogue; optimise GLB assets and thumbnails; build controlled admin uploads and target compilation.
+1. Populate and optimise your actual GLB catalogue/thumbnails. For non-technical content managers, add a separately scoped admin upload/storage/moderation workflow and marker-target compilation.
 2. Add an API, database and object storage; persistent short project URLs/QRs; versioned publish records and access/revocation controls.
 3. Add teacher/student roles, private classrooms and age-appropriate content controls. Avoid collecting unnecessary children's personal data.
 4. Validate child-data/privacy requirements for the intended schools and jurisdictions; implement the required consent, retention and safeguarding controls.
