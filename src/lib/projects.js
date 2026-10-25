@@ -1,3 +1,4 @@
+import { APP_BASE, fragmentParams } from "./deployment";
 import LZString from "lz-string";
 import { ASSETS, MARKERS, sceneObject, getAsset } from "./assets";
 
@@ -206,15 +207,20 @@ export function decodeScene(encoded) {
   });
 }
 export function projectFromLocation() {
-  const h = window.location.hash;
-  if (!h.startsWith("#scene="))
+  const encoded = fragmentParams().get("scene");
+  if (!encoded)
     throw new Error(
       "No project was included in this link. Ask your creator for a new share link.",
     );
-  return decodeScene(h.slice(7));
+  return decodeScene(encoded);
 }
 export function shareUrl(project, page = "view") {
-  return `${window.location.origin}/${page}#scene=${encodeScene(project)}`;
+  const url = new URL(APP_BASE, window.location.origin);
+  url.hash = new URLSearchParams({
+    page: page === "print" ? "print" : "view",
+    scene: encodeScene(project),
+  }).toString();
+  return url.toString();
 }
 export function downloadProject(project) {
   const blob = new Blob([JSON.stringify(validateProject(project), null, 2)], {

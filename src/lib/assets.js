@@ -1,3 +1,4 @@
+import { publicUrl } from "./deployment";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
@@ -105,16 +106,16 @@ export const MARKERS = [
     id: "space-explorer",
     name: "Space explorer",
     subtitle: "A universe of possibilities",
-    image: "/markers/space-explorer.jpg",
-    target: "/markers/space-explorer.mind",
+    image: publicUrl("markers/space-explorer.jpg"),
+    target: publicUrl("markers/space-explorer.mind"),
     color: "#e9e5fa",
   },
   {
     id: "forest-friends",
     name: "Forest friends",
     subtitle: "Let your ideas grow wild",
-    image: "/markers/forest-friends.jpg",
-    target: "/markers/forest-friends.mind",
+    image: publicUrl("markers/forest-friends.jpg"),
+    target: publicUrl("markers/forest-friends.mind"),
     color: "#e5f1e8",
   },
 ];
