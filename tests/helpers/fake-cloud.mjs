@@ -12,7 +12,12 @@ const cors = {
 };
 
 export function createCloudStore() {
-  return { files: new Map(), requests: [] };
+  // Mirrors the bucket policy in LESSON-BOXES.md plus the marker upgrade.
+  return {
+    files: new Map(),
+    requests: [],
+    folders: ["audio", "video", "lessons", "markers"],
+  };
 }
 
 export async function useFakeCloud(context, store) {
@@ -72,6 +77,12 @@ export async function useFakeCloud(context, store) {
         !path.startsWith(`${TEACHER_ID}/`)
       )
         return json(403, { message: "new row violates row-level security" });
+      if (!store.folders.includes(path.split("/")[1]))
+        return json(400, {
+          statusCode: "403",
+          error: "Unauthorized",
+          message: "new row violates row-level security policy",
+        });
       store.files.set(path, {
         type: headers["content-type"],
         body: request.postDataBuffer(),
