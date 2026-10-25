@@ -31,6 +31,7 @@ import {
   Grip,
   Hand,
   Image,
+  ImagePlus,
   Layers,
   LayoutTemplate,
   Leaf,
@@ -70,6 +71,8 @@ import AssetImage from "./components/AssetImage";
 import Viewer from "./components/Viewer";
 import PrintPage from "./components/PrintPage";
 import ShareModal from "./components/ShareModal";
+import MarkerMaker from "./components/MarkerMaker";
+import { loadMyMarkers, saveMyMarkers } from "./lib/marker-maker";
 import {
   CardProperties,
   LessonToolsPanel,
@@ -90,6 +93,7 @@ import {
   catalogue,
   getAsset,
   getMarker,
+  registerCustomMarker,
   sceneObject,
 } from "./lib/assets";
 import {
@@ -151,6 +155,12 @@ function StudioApp() {
     [pickCardId, setPickCardId] = useState(null),
     [previewCard, setPreviewCard] = useState(null);
   const teacher = useTeacherSession();
+  const [myMarkers, setMyMarkers] = useState(() =>
+    loadMyMarkers((m) => registerCustomMarker(m)?.definition || null),
+  );
+  useEffect(() => {
+    saveMyMarkers(myMarkers);
+  }, [myMarkers]);
   const canvas = useRef(null),
     toastTimer = useRef(null),
     history = useRef({ past: [], future: [] }),
@@ -514,7 +524,9 @@ function StudioApp() {
         <nav className="main-nav" aria-label="Main navigation">
           <button
             aria-label="Create"
-            className={page === "studio" ? "active" : ""}
+            className={
+              page === "studio" || page === "marker-maker" ? "active" : ""
+            }
             onClick={() => navigate("studio")}
           >
             <WandSparkles size={17} />
@@ -595,9 +607,7 @@ function StudioApp() {
                   />
                   <span className="project-subject">
                     <Orbit size={12} />
-                    {getMarker(project.markerId).id === "space-explorer"
-                      ? "Space explorer"
-                      : "Forest friends"}
+                    {getMarker(project.markerId).name}
                   </span>
                 </div>
               </div>
@@ -835,12 +845,89 @@ function StudioApp() {
                     A little picture that brings your creation to life. Choose
                     one, then print it.
                   </p>
+                  <button
+                    className="button primary full marker-maker-button"
+                    onClick={() => navigate("marker-maker")}
+                  >
+                    <ImagePlus size={15} />
+                    Create your own marker
+                  </button>
+                  {(() => {
+                    const current = getMarker(project.markerId);
+                    const mine = [
+                      ...(current.custom &&
+                      !myMarkers.some((m) => m.id === current.id)
+                        ? [current.definition]
+                        : []),
+                      ...myMarkers,
+                    ];
+                    return mine.length ? (
+                      <div className="my-markers" aria-label="My markers">
+                        <span className="field-label">MY MARKERS</span>
+                        {mine.map((m) => (
+                          <div
+                            className={`marker-card custom ${m.id === project.markerId ? "active" : ""}`}
+                            key={m.id}
+                          >
+                            <button
+                              className="marker-card-main"
+                              aria-label={`Use ${m.name} marker`}
+                              onClick={() => {
+                                registerCustomMarker(m);
+                                commit({ markerId: m.id, marker: m });
+                                notify(
+                                  `${m.name} selected. Print a new sheet when you share.`,
+                                );
+                              }}
+                            >
+                              <img
+                                src={m.image}
+                                alt={`${m.name} tracking image`}
+                              />
+                              <span className="marker-card-info">
+                                <strong>{m.name}</strong>
+                                <small>
+                                  {m.id === project.markerId
+                                    ? "Used in this project"
+                                    : "Made by you"}
+                                </small>
+                              </span>
+                              <span className="marker-selected">
+                                {m.id === project.markerId ? (
+                                  <Check size={14} />
+                                ) : (
+                                  <Plus size={14} />
+                                )}
+                              </span>
+                            </button>
+                            {myMarkers.some((x) => x.id === m.id) ? (
+                              <IconButton
+                                label={`Remove ${m.name} from my markers`}
+                                className="marker-remove"
+                                onClick={() => {
+                                  setMyMarkers((list) =>
+                                    list.filter((x) => x.id !== m.id),
+                                  );
+                                  notify(
+                                    "Removed from your list. Projects and printed sheets that use it keep working.",
+                                  );
+                                }}
+                              >
+                                <X size={13} />
+                              </IconButton>
+                            ) : null}
+                          </div>
+                        ))}
+                        <span className="field-label">BUILT-IN MARKERS</span>
+                      </div>
+                    ) : null;
+                  })()}
                   {MARKERS.map((m) => (
                     <button
                       className={`marker-card ${m.id === project.markerId ? "active" : ""}`}
                       key={m.id}
                       onClick={() => {
-                        commit({ markerId: m.id });
+                        commit({ markerId: m.id, marker: undefined });
                         notify(
                           `${m.name} selected. Print a new sheet when you share.`,
                         );
@@ -1229,6 +1316,30 @@ function StudioApp() {
             </button>
           </footer>
         </>
+      ) : page === "marker-maker" ? (
+        <MarkerMaker
+          session={teacher}
+          notify={notify}
+          onSignIn={() => setDialog("signin")}
+          onBack={() => navigate("studio")}
+          onSaved={(definition) => {
+            const marker = registerCustomMarker(definition);
+            if (!marker) return;
+            setMyMarkers((list) =>
+              [
+                marker.definition,
+                ...list.filter((m) => m.id !== marker.id),
+              ].slice(0, 40),
+            );
+            if (project)
+              commit({ markerId: marker.id, marker: marker.definition });
+            setLibraryTab("markers");
+            setPage("studio");
+            notify(
+              `${marker.name} is ready and used in this project. Print a new sheet to try it.`,
+            );
+          }}
+        />
       ) : page === "templates" ? (
         <TemplatesPage
           onCreate={createProject}
