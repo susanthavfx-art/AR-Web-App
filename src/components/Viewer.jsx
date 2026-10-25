@@ -1,3 +1,4 @@
+import { APP_BASE } from "../lib/deployment";
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import {
@@ -38,7 +39,7 @@ export function LinkError({ message }) {
       </span>
       <h1>This wonder needs a new link.</h1>
       <p>{message}</p>
-      <a href="/" className="button primary">
+      <a href={APP_BASE} className="button primary">
         <ArrowLeft size={17} />
         Open Wonderlab
       </a>
@@ -374,7 +375,7 @@ function ViewerExperience({ project }) {
   return (
     <main className="viewer-page">
       <header className="viewer-header">
-        <a href="/" aria-label="Wonderlab studio">
+        <a href={APP_BASE} aria-label="Wonderlab studio">
           <Logo small />
         </a>
         <span className="viewer-top-badge">
@@ -474,7 +475,7 @@ function ViewerExperience({ project }) {
       <footer className="viewer-footer">
         <Logo small />
         <span>Made for little big thinkers.</span>
-        <a href="/">
+        <a href={APP_BASE}>
           Make your own <ChevronRight size={14} />
         </a>
       </footer>
