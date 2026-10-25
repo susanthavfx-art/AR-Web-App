@@ -17,7 +17,7 @@ test("authoring: library, transforms, history, animations, markers and local per
 }) => {
   const errors = errorsFor(page);
   await page.goto(appPath);
-  await expect(page.locator(".asset-card")).toHaveCount(12);
+  await expect(page.locator(".asset-card")).toHaveCount(13);
   await expect(page.getByLabel("Object name")).toHaveValue("Earth");
   await page.getByLabel("Search objects").fill("robot");
   await expect(page.locator(".asset-card")).toHaveCount(1);
@@ -246,6 +246,14 @@ for (const marker of ["space-explorer", "forest-friends"]) {
           name: "Forest friends Let your ideas grow wild",
         })
         .click();
+    }
+    // Also exercise a downloaded, animated GLB in the actual tracking scene.
+    if (marker === "space-explorer") {
+      await page.getByLabel("Search objects").fill("Wonder Bot");
+      await page
+        .getByRole("button", { name: "Add Wonder Bot to your scene" })
+        .click();
+      await expect(page.locator(".model-load-note")).toHaveCount(0);
     }
     await page.getByRole("button", { name: "Publish & share" }).click();
     const link = await page.locator("#share-link").inputValue();

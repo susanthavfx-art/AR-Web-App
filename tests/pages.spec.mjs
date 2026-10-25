@@ -18,7 +18,7 @@ test("GitHub project subfolder: assets, fresh share loads and in-tab hash routin
   await expect(page.getByLabel("Project title")).toHaveValue(
     "My space adventure",
   );
-  await expect(page.locator(".asset-card")).toHaveCount(12);
+  await expect(page.locator(".asset-card")).toHaveCount(13);
   expect(
     await page.evaluate(async () => {
       await document.fonts.ready;
