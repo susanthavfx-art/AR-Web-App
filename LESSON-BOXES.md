@@ -56,7 +56,8 @@ values (
   'lesson-media', 'lesson-media', true, 52428800,
   array[
     'audio/mpeg','audio/mp4','audio/aac','audio/wav','audio/x-wav','audio/ogg','audio/webm',
-    'video/mp4','video/webm','video/quicktime','application/json'
+    'video/mp4','video/webm','video/quicktime','application/json',
+    'image/jpeg','application/octet-stream'
   ]
 )
 on conflict (id) do update set
@@ -70,9 +71,11 @@ on storage.objects for insert to authenticated
 with check (
   bucket_id = 'lesson-media'
   and (storage.foldername(name))[1] = (select auth.uid()::text)
-  and (storage.foldername(name))[2] in ('audio', 'video', 'lessons')
+  and (storage.foldername(name))[2] in ('audio', 'video', 'lessons', 'markers')
 );
 ```
+
+> This SQL already includes teacher-made markers. If you ran the older version before, run the short update in [MARKER-MAKER.md](MARKER-MAKER.md).
 
 Files stay in the bucket. Old QR codes keep working only while their files remain.
 
