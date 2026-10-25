@@ -24,6 +24,6 @@ export function currentPage() {
   }
   if (/^\/view(?:\/|$)/.test(pathname)) return "view";
   if (/^\/print(?:\/|$)/.test(pathname)) return "print";
-  if (params.has("scene")) return "view";
+  if (params.has("scene") || params.has("lesson")) return "view";
   return "studio";
 }

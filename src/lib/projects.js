@@ -8,6 +8,8 @@ import {
   hasAsset,
   registerSharedModel,
 } from "./assets";
+import { decodeCards, encodeCards, validateCards } from "./lesson-cards";
+import { fetchLesson, validLessonKey } from "./cloud";
 
 export const STORAGE_KEY = "wonderlab.projects.v1";
 export const ACTIVE_KEY = "wonderlab.active.v1";
@@ -86,6 +88,7 @@ export function newProject(templateId = "blank") {
     title: t.name,
     markerId: t.markerId,
     objects: t.objects(),
+    cards: [],
     updatedAt: new Date().toISOString(),
   };
 }
@@ -116,7 +119,7 @@ export function validateProject(input) {
       return object;
     });
   const ids = new Set();
-  return {
+  const project = {
     version: 2,
     id:
       typeof input.id === "string" && input.id.length < 80
@@ -168,6 +171,11 @@ export function validateProject(input) {
         };
       }),
   };
+  project.cards = validateCards(
+    input.cards,
+    new Set(project.objects.map((o) => o.id)),
+  );
+  return project;
 }
 export function loadProjects() {
   try {
@@ -225,13 +233,14 @@ export function encodeScene(project) {
       return row;
     }),
   };
+  if (p.cards.length) compact.c = encodeCards(p.cards, p.objects);
   return LZString.compressToEncodedURIComponent(JSON.stringify(compact));
 }
 export function decodeScene(encoded) {
-  if (!encoded || encoded.length > 12000)
+  if (!encoded || encoded.length > 40000)
     throw new Error("This project link is missing or too large.");
   const raw = LZString.decompressFromEncodedURIComponent(encoded);
-  if (!raw || raw.length > 25000)
+  if (!raw || raw.length > 90000)
     throw new Error("This project link could not be read.");
   const data = JSON.parse(raw);
   if (![1, 2].includes(data.v) || !Array.isArray(data.o))
@@ -253,10 +262,14 @@ export function decodeScene(encoded) {
       definitions.push(asset);
     }
   }
+  if (data.o.length > MAX_OBJECTS)
+    throw new Error("This project link has too many objects.");
+  const objectIds = data.o.map(() => crypto.randomUUID());
   return validateProject({
     title: data.n,
     markerId: MARKERS[data.m]?.id,
-    objects: data.o.map((row) => {
+    cards: decodeCards(data.c, objectIds),
+    objects: data.o.map((row, index) => {
       if (!Array.isArray(row))
         throw new Error("A scene object could not be read.");
       const id =
@@ -284,7 +297,7 @@ export function decodeScene(encoded) {
       }
       const asset = hasAsset(id) ? getAsset(id, definition) : null;
       return {
-        id: crypto.randomUUID(),
+        id: objectIds[index],
         assetId: id,
         ...(asset?.model ? { model: asset.model } : {}),
         position: row.slice(1, 4),
@@ -298,6 +311,16 @@ export function decodeScene(encoded) {
     }),
   });
 }
+// Short lesson links load a published snapshot from the optional cloud store.
+export async function loadProjectFromLocation() {
+  const lesson = fragmentParams().get("lesson");
+  if (lesson) {
+    if (!validLessonKey(lesson))
+      throw new Error("This lesson link is not valid. Ask for a new link.");
+    return { project: validateProject(await fetchLesson(lesson)), lesson };
+  }
+  return { project: projectFromLocation(), lesson: "" };
+}
 export function projectFromLocation() {
   const encoded = fragmentParams().get("scene");
   if (!encoded)
@@ -306,11 +329,11 @@ export function projectFromLocation() {
     );
   return decodeScene(encoded);
 }
-export function shareUrl(project, page = "view") {
+export function shareUrl(project, page = "view", lesson = "") {
   const url = new URL(APP_BASE, window.location.origin);
   url.hash = new URLSearchParams({
     page: page === "print" ? "print" : "view",
-    scene: encodeScene(project),
+    ...(lesson ? { lesson } : { scene: encodeScene(project) }),
   }).toString();
   return url.toString();
 }

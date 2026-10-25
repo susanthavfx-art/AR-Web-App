@@ -1,10 +1,10 @@
 import QRCode from "qrcode";
 import { getMarker } from "./assets";
 import { shareUrl, slug } from "./projects";
-export async function markerPdf(project, save = true) {
+export async function markerPdf(project, save = true, lesson = "") {
   const { jsPDF } = await import("jspdf");
   const marker = getMarker(project.markerId),
-    url = shareUrl(project);
+    url = shareUrl(project, "view", lesson);
   const qr = await QRCode.toDataURL(url, {
     width: 700,
     margin: 2,
