@@ -1,6 +1,13 @@
 import { APP_BASE, fragmentParams } from "./deployment";
 import LZString from "lz-string";
-import { ASSETS, MARKERS, sceneObject, getAsset } from "./assets";
+import {
+  ASSETS,
+  MARKERS,
+  sceneObject,
+  getAsset,
+  hasAsset,
+  registerSharedModel,
+} from "./assets";
 
 export const STORAGE_KEY = "wonderlab.projects.v1";
 export const ACTIVE_KEY = "wonderlab.active.v1";
@@ -74,7 +81,7 @@ export const TEMPLATES = [
 export function newProject(templateId = "blank") {
   const t = TEMPLATES.find((t) => t.id === templateId) || TEMPLATES[3];
   return {
-    version: 1,
+    version: 2,
     id: crypto.randomUUID(),
     title: t.name,
     markerId: t.markerId,
@@ -93,9 +100,24 @@ export function validateProject(input) {
     throw new Error(
       `Keep your scene to ${MAX_OBJECTS} objects for a smooth mobile experience.`,
     );
+  const candidates = input.objects
+    .filter((o) => o && typeof o.assetId === "string")
+    .map((object) => {
+      if (object.assetId.startsWith("model:") && object.model) {
+        const asset = registerSharedModel(object.model);
+        if (asset.id !== object.assetId)
+          throw new Error("A model definition does not match its model id.");
+        return { ...object, model: asset.model };
+      }
+      if (object.assetId.startsWith("model:") && !hasAsset(object.assetId))
+        throw new Error(
+          "A GLB model definition is missing. Open the latest app and re-export this project.",
+        );
+      return object;
+    });
   const ids = new Set();
   return {
-    version: 1,
+    version: 2,
     id:
       typeof input.id === "string" && input.id.length < 80
         ? input.id
@@ -112,8 +134,8 @@ export function validateProject(input) {
       Number.isFinite(Date.parse(input.updatedAt))
         ? new Date(input.updatedAt).toISOString()
         : new Date().toISOString(),
-    objects: input.objects
-      .filter((o) => o && ASSETS.some((a) => a.id === o.assetId))
+    objects: candidates
+      .filter((o) => hasAsset(o.assetId))
       .map((o) => {
         let id =
           typeof o.id === "string" && o.id.length < 80
@@ -124,10 +146,13 @@ export function validateProject(input) {
         return {
           id,
           assetId: o.assetId,
+          ...(getAsset(o.assetId, o.model).model
+            ? { model: getAsset(o.assetId, o.model).model }
+            : {}),
           name:
             typeof o.name === "string"
               ? o.name.slice(0, 35)
-              : getAsset(o.assetId).name,
+              : getAsset(o.assetId, o.model).name,
           position: [0, 1, 2].map((i) =>
             number(o.position?.[i], 0, i === 1 ? 0 : -4, i === 1 ? 4 : 4),
           ),
@@ -147,7 +172,14 @@ export function validateProject(input) {
 export function loadProjects() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-    if (Array.isArray(saved)) return saved.slice(0, 30).map(validateProject);
+    if (Array.isArray(saved))
+      return saved.slice(0, 30).flatMap((project) => {
+        try {
+          return [validateProject(project)];
+        } catch {
+          return [];
+        }
+      });
   } catch {
     /* A corrupt or unavailable store should never prevent opening the editor. */
   }
@@ -163,21 +195,35 @@ export function saveProjects(projects) {
 }
 const r = (n) => Math.round(n * 100) / 100;
 export function encodeScene(project) {
-  const p = validateProject(project);
+  const p = validateProject(project),
+    definitions = [],
+    references = new Map();
   const compact = {
-    v: 1,
+    v: 2,
     n: p.title,
     m: MARKERS.findIndex((m) => m.id === p.markerId),
-    o: p.objects.map((o) => [
-      ASSETS.findIndex((a) => a.id === o.assetId),
-      ...o.position.map(r),
-      ...o.rotation.map(r),
-      r(o.scale),
-      ["none", "float", "spin"].indexOf(o.animation),
-      o.visible ? 1 : 0,
-      o.name === getAsset(o.assetId).name ? "" : o.name,
-      o.color || "",
-    ]),
+    a: definitions,
+    o: p.objects.map((o) => {
+      const row = [
+        o.assetId,
+        ...o.position.map(r),
+        ...o.rotation.map(r),
+        r(o.scale),
+        ["none", "float", "spin"].indexOf(o.animation),
+        o.visible ? 1 : 0,
+        o.name === getAsset(o.assetId, o.model).name ? "" : o.name,
+        o.color || "",
+      ];
+      if (o.model) {
+        const key = JSON.stringify(o.model);
+        if (!references.has(key)) {
+          references.set(key, definitions.length);
+          definitions.push(o.model);
+        }
+        row.push(references.get(key));
+      }
+      return row;
+    }),
   };
   return LZString.compressToEncodedURIComponent(JSON.stringify(compact));
 }
@@ -188,22 +234,68 @@ export function decodeScene(encoded) {
   if (!raw || raw.length > 25000)
     throw new Error("This project link could not be read.");
   const data = JSON.parse(raw);
-  if (data.v !== 1 || !Array.isArray(data.o))
+  if (![1, 2].includes(data.v) || !Array.isArray(data.o))
     throw new Error("This project link uses an unsupported format.");
+  const definitions = [],
+    unique = new Set();
+  if (data.v === 2) {
+    if (
+      data.a !== undefined &&
+      (!Array.isArray(data.a) || data.a.length > MAX_OBJECTS)
+    )
+      throw new Error("Too many model definitions in this project link.");
+    for (const definition of data.a || []) {
+      const asset = registerSharedModel(definition),
+        key = JSON.stringify(asset.model);
+      if (unique.has(key))
+        throw new Error("Duplicate model definitions in this project link.");
+      unique.add(key);
+      definitions.push(asset);
+    }
+  }
   return validateProject({
     title: data.n,
     markerId: MARKERS[data.m]?.id,
-    objects: data.o.map((a) => ({
-      id: crypto.randomUUID(),
-      assetId: ASSETS[a[0]]?.id,
-      position: a.slice(1, 4),
-      rotation: a.slice(4, 7),
-      scale: a[7],
-      animation: ["none", "float", "spin"][a[8]],
-      visible: a[9] !== 0,
-      name: a[10] || ASSETS[a[0]]?.name,
-      color: a[11],
-    })),
+    objects: data.o.map((row) => {
+      if (!Array.isArray(row))
+        throw new Error("A scene object could not be read.");
+      const id =
+        data.v === 1
+          ? Number.isInteger(row[0]) && row[0] >= 0 && row[0] < 12
+            ? ASSETS[row[0]]?.id
+            : undefined
+          : row[0];
+      let definition;
+      if (data.v === 2 && row[12] !== undefined) {
+        if (
+          !Number.isInteger(row[12]) ||
+          !definitions[row[12]] ||
+          definitions[row[12]].id !== id
+        )
+          throw new Error("A model reference in this project link is invalid.");
+        definition = definitions[row[12]].model;
+      } else if (data.v === 2) {
+        const matches = definitions.filter((asset) => asset.id === id);
+        if (matches.length > 1)
+          throw new Error(
+            "A model reference in this project link is ambiguous.",
+          );
+        definition = matches[0]?.model;
+      }
+      const asset = hasAsset(id) ? getAsset(id, definition) : null;
+      return {
+        id: crypto.randomUUID(),
+        assetId: id,
+        ...(asset?.model ? { model: asset.model } : {}),
+        position: row.slice(1, 4),
+        rotation: row.slice(4, 7),
+        scale: row[7],
+        animation: ["none", "float", "spin"][row[8]],
+        visible: row[9] !== 0,
+        name: row[10] || asset?.name,
+        color: row[11],
+      };
+    }),
   });
 }
 export function projectFromLocation() {

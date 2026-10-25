@@ -1,3 +1,5 @@
+import { createGLBModel, fetchCatalogue, modelAsset } from "./model-library";
+export { catalogue, tickModel } from "./model-library";
 import { publicUrl } from "./deployment";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
@@ -120,7 +122,29 @@ export const MARKERS = [
   },
 ];
 export const getMarker = (id) => MARKERS.find((m) => m.id === id) || MARKERS[0];
-export const getAsset = (id) => ASSETS.find((a) => a.id === id) || ASSETS[0];
+const sharedModels = new Map();
+export const findAsset = (id) =>
+  ASSETS.find((a) => a.id === id) || sharedModels.get(id);
+export const getAsset = (id, definition) => {
+  if (definition) {
+    const asset = modelAsset(definition);
+    if (asset.id === id) return asset;
+  }
+  return findAsset(id) || ASSETS[0];
+};
+export const hasAsset = (id) => !!findAsset(id);
+export function registerSharedModel(input) {
+  const asset = modelAsset(input);
+  const existing = findAsset(asset.id);
+  if (!existing) sharedModels.set(asset.id, asset);
+  return asset;
+}
+export async function initialiseLibrary() {
+  const models = await fetchCatalogue();
+  for (const asset of models)
+    if (!ASSETS.some((a) => a.id === asset.id)) ASSETS.push(asset);
+  return models;
+}
 const mat = (color, extra = {}) =>
   new THREE.MeshStandardMaterial({
     color,
@@ -264,7 +288,9 @@ function makeEarthTexture() {
   return earthTexture;
 }
 
-export function createAsset(id, tint) {
+export function createAsset(id, tint, definition) {
+  const asset = getAsset(id, definition);
+  if (asset.kind === "glb") return createGLBModel(asset, tint);
   const g = new THREE.Group();
   const defaultColor = getAsset(id).color;
   const color = tint || defaultColor;
@@ -553,6 +579,7 @@ export function sceneObject(
     id: crypto.randomUUID(),
     assetId,
     name: getAsset(assetId).name,
+    ...(getAsset(assetId).model ? { model: getAsset(assetId).model } : {}),
     position,
     rotation: [0, 0, 0],
     scale,
@@ -570,6 +597,11 @@ export function applyObjectTransform(group, object) {
 }
 export function disposeGroup(group) {
   group.traverse((o) => {
+    o.userData.disposed = true;
+    if (o.userData.mixer) {
+      o.userData.mixer.stopAllAction();
+      o.userData.mixer.uncacheRoot(o.userData.mixerRoot);
+    }
     if (o.geometry) o.geometry.dispose();
     if (o.material) {
       const ms = Array.isArray(o.material) ? o.material : [o.material];
@@ -599,42 +631,82 @@ export function addLights(scene, shadows = true) {
 }
 let thumbnailRenderer;
 const thumbnailCache = new Map();
-export function assetThumbnail(id) {
-  if (thumbnailCache.has(id)) return thumbnailCache.get(id);
-  try {
-    if (!thumbnailRenderer) {
-      thumbnailRenderer = new THREE.WebGLRenderer({
-        alpha: true,
-        antialias: true,
-        preserveDrawingBuffer: true,
-      });
-      thumbnailRenderer.setSize(260, 230);
-      thumbnailRenderer.setPixelRatio(1);
-      thumbnailRenderer.outputColorSpace = THREE.SRGBColorSpace;
-      thumbnailRenderer.toneMapping = THREE.ACESFilmicToneMapping;
-      thumbnailRenderer.toneMappingExposure = 1.1;
-    }
-    const scene = new THREE.Scene();
-    addLights(scene, false);
-    const model = createAsset(id);
-    scene.add(model);
-    const bounds = new THREE.Box3().setFromObject(model),
-      center = bounds.getCenter(new THREE.Vector3());
-    const size = bounds.getSize(new THREE.Vector3()),
-      span = Math.max(size.x, size.y, size.z);
-    const cam = new THREE.PerspectiveCamera(32, 260 / 230, 0.1, 30);
-    cam.position.set(
-      center.x + span * 1.1,
-      center.y + span * 0.5,
-      center.z + span * 2.7,
-    );
-    cam.lookAt(center);
-    thumbnailRenderer.render(scene, cam);
-    const img = thumbnailRenderer.domElement.toDataURL("image/png");
-    thumbnailCache.set(id, img);
-    disposeGroup(model);
-    return img;
-  } catch {
-    return "";
+const thumbnailJobs = new Map();
+export const MODEL_PLACEHOLDER =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="260" height="230" viewBox="0 0 260 230"><path d="m130 48 58 32v67l-58 34-58-34V80Z" fill="#d9e7df" stroke="#9bb5a8" stroke-width="3" stroke-linejoin="round"/><path d="m72 80 58 35 58-35M130 115v66" fill="none" stroke="#9bb5a8" stroke-width="3"/><circle cx="187" cy="58" r="16" fill="#f7f3e5"/><path d="M187 50v16m-8-8h16" stroke="#b4a6cc" stroke-width="2" stroke-linecap="round"/></svg>',
+  );
+function renderThumbnail(key, model) {
+  if (!thumbnailRenderer) {
+    thumbnailRenderer = new THREE.WebGLRenderer({
+      alpha: true,
+      antialias: true,
+      preserveDrawingBuffer: true,
+    });
+    thumbnailRenderer.setSize(260, 230);
+    thumbnailRenderer.setPixelRatio(1);
+    thumbnailRenderer.outputColorSpace = THREE.SRGBColorSpace;
+    thumbnailRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+    thumbnailRenderer.toneMappingExposure = 1.1;
   }
+  const scene = new THREE.Scene();
+  addLights(scene, false);
+  scene.add(model);
+  const bounds = new THREE.Box3().setFromObject(model),
+    centre = bounds.getCenter(new THREE.Vector3());
+  const size = bounds.getSize(new THREE.Vector3()),
+    span = Math.max(0.1, size.x, size.y, size.z);
+  const camera = new THREE.PerspectiveCamera(
+    32,
+    260 / 230,
+    0.01,
+    span * 12 + 10,
+  );
+  camera.position.set(
+    centre.x + span * 1.1,
+    centre.y + span * 0.5,
+    centre.z + span * 2.7,
+  );
+  camera.lookAt(centre);
+  thumbnailRenderer.render(scene, camera);
+  const image = thumbnailRenderer.domElement.toDataURL("image/png");
+  thumbnailCache.set(key, image);
+  disposeGroup(model);
+  return image;
+}
+function thumbnailKey(asset) {
+  return asset.kind === "glb"
+    ? asset.id + ":" + JSON.stringify(asset.model)
+    : asset.id;
+}
+export function assetThumbnail(id, definition) {
+  const asset = getAsset(id, definition),
+    key = thumbnailKey(asset);
+  if (asset.thumbnailUrl) return asset.thumbnailUrl;
+  if (thumbnailCache.has(key)) return thumbnailCache.get(key);
+  if (asset.kind === "glb") return MODEL_PLACEHOLDER;
+  try {
+    return renderThumbnail(key, createAsset(id));
+  } catch {
+    return MODEL_PLACEHOLDER;
+  }
+}
+export function assetThumbnailAsync(id, definition) {
+  const asset = getAsset(id, definition),
+    key = thumbnailKey(asset);
+  if (asset.kind !== "glb" || asset.thumbnailUrl || thumbnailCache.has(key))
+    return Promise.resolve(assetThumbnail(id, definition));
+  if (!thumbnailJobs.has(key)) {
+    const model = createAsset(id, undefined, definition);
+    const job = model.userData.ready.then(() => {
+      if (model.userData.loadError) {
+        disposeGroup(model);
+        throw new Error(model.userData.loadError);
+      }
+      return renderThumbnail(key, model);
+    });
+    thumbnailJobs.set(key, job);
+  }
+  return thumbnailJobs.get(key);
 }
