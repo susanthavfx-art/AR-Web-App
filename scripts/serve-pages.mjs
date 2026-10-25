@@ -17,6 +17,9 @@ const types = {
   ".png": "image/png",
   ".woff2": "font/woff2",
   ".json": "application/json",
+  ".glb": "model/gltf-binary",
+  ".wasm": "application/wasm",
+  ".webp": "image/webp",
 };
 http
   .createServer((req, res) => {
