@@ -1,4 +1,9 @@
 import { test, expect } from "@playwright/test";
+import fs from "node:fs/promises";
+const catalogue = JSON.parse(
+  await fs.readFile("public/models/catalog.json", "utf8"),
+);
+const libraryCount = 12 + catalogue.models.length;
 const appPath = process.env.APP_BASE_PATH || "/";
 test("GitHub project subfolder: assets, fresh share loads and in-tab hash routing without SPA fallback", async ({
   page,
@@ -18,7 +23,7 @@ test("GitHub project subfolder: assets, fresh share loads and in-tab hash routin
   await expect(page.getByLabel("Project title")).toHaveValue(
     "My space adventure",
   );
-  await expect(page.locator(".asset-card")).toHaveCount(13);
+  await expect(page.locator(".asset-card")).toHaveCount(libraryCount);
   expect(
     await page.evaluate(async () => {
       await document.fonts.ready;

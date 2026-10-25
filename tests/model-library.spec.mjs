@@ -48,25 +48,17 @@ async function imageOfCanvas(page) {
   return page.locator(".studio-canvas canvas").evaluate((c) => c.toDataURL());
 }
 
-test("catalogue, guide, GLB thumbnail, embedded animation, transforms, cloning, save and JSON backup", async ({
+test("curated catalogue, GLB thumbnail, embedded animation, transforms, cloning, save and JSON backup", async ({
   page,
 }) => {
   const errors = errorsFor(page);
   await page.goto(appPath);
-  await expect(page.locator(".asset-card")).toHaveCount(13);
-  await page
-    .getByRole("button", { name: "Add your own models", exact: true })
-    .click();
-  const guide = page.getByRole("dialog", { name: "Add your own models" });
-  await expect(guide).toContainText("public/models/catalog.json");
-  await expect(guide.locator("pre")).toContainText('"file": "lion.glb"');
-  await expect(
-    guide.getByRole("link", { name: "Edit catalogue" }),
-  ).toHaveAttribute(
-    "href",
-    "https://github.com/susanthavfx-art/AR-Web-App/edit/main/public/models/catalog.json",
+  await expect(page.locator(".asset-card")).toHaveCount(
+    12 + catalogue.models.length,
   );
-  await guide.getByRole("button", { name: "Close dialog" }).click();
+  await expect(
+    page.getByRole("button", { name: "Add your own models", exact: true }),
+  ).toHaveCount(0);
   await page
     .getByRole("button", { name: "Templates", exact: false })
     .first()
@@ -74,7 +66,7 @@ test("catalogue, guide, GLB thumbnail, embedded animation, transforms, cloning, 
   await page
     .getByRole("button", { name: "Use My next big idea template" })
     .click();
-  await page.getByRole("button", { name: "Your models", exact: true }).click();
+  await page.getByLabel("Search objects").fill("Wonder Bot");
   await expect(page.locator(".asset-card")).toHaveCount(1);
   const card = page.getByRole("button", {
     name: "Add Wonder Bot to your scene",
@@ -269,14 +261,12 @@ test("invalid catalogue entries are reported, and a missing GLB gives an actiona
   await blank(page);
   await page.goto(appPath);
   await expect(page.locator(".asset-card")).toHaveCount(14);
-  await expect(page.locator(".catalogue-notice")).toContainText("2 issues");
-  await page
-    .getByRole("button", { name: "Add your own models", exact: true })
-    .click();
-  const guide = page.getByRole("dialog", { name: "Add your own models" });
-  await expect(guide).toContainText("Duplicate model id");
-  await expect(guide).toContainText("Invalid filename");
-  await guide.getByRole("button", { name: "Close dialog" }).click();
+  await expect(page.locator(".catalogue-notice")).toContainText(
+    "Some library items are unavailable",
+  );
+  await expect(
+    page.getByRole("button", { name: "Add your own models", exact: true }),
+  ).toHaveCount(0);
   await page.getByLabel("Search objects").fill("Missing Model");
   await page
     .getByRole("button", { name: "Add Missing Model to your scene" })
@@ -310,7 +300,9 @@ test("missing or malformed catalogue leaves the twelve demo objects usable", asy
     await page.goto(appPath);
     if (badJSON) await page.reload();
     await expect(page.locator(".asset-card")).toHaveCount(12);
-    await expect(page.locator(".catalogue-notice")).toContainText("1 issue");
+    await expect(page.locator(".catalogue-notice")).toContainText(
+      "Some library items are unavailable",
+    );
     await page
       .getByRole("button", { name: "Add Rocket to your scene" })
       .click();

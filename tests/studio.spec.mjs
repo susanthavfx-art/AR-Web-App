@@ -1,4 +1,9 @@
 import { test, expect } from "@playwright/test";
+import fs from "node:fs/promises";
+const catalogue = JSON.parse(
+  await fs.readFile("public/models/catalog.json", "utf8"),
+);
+const libraryCount = 12 + catalogue.models.length;
 const key = "wonderlab.projects.v1";
 const appPath = process.env.APP_BASE_PATH || "/";
 const errorsFor = (page) => {
@@ -17,7 +22,7 @@ test("authoring: library, transforms, history, animations, markers and local per
 }) => {
   const errors = errorsFor(page);
   await page.goto(appPath);
-  await expect(page.locator(".asset-card")).toHaveCount(13);
+  await expect(page.locator(".asset-card")).toHaveCount(libraryCount);
   await expect(page.getByLabel("Object name")).toHaveValue("Earth");
   await page.getByLabel("Search objects").fill("robot");
   await expect(page.locator(".asset-card")).toHaveCount(1);
