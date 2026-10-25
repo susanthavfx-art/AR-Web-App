@@ -1,4 +1,6 @@
-# Library ekata aluth GLB models add karana hati
+# Library ekata aluth GLB models add karana hati — OWNER guide
+
+> Teachers lata model uploads/GitHub instructions penenne naha. Owner-curated library saha new categories: [TEACHER-LIBRARY.md](TEACHER-LIBRARY.md). This document is for the repository owner, not a teacher upload workflow.
 
 **Me version eke JavaScript edit karanna one naha.** Model file eka GitHub ekata upload karala `public/models/catalog.json` ekata entry ekak add karanna.
 
@@ -49,7 +51,7 @@ Included sample eka thiyala, `models` array eka athule aluth object ekak add kar
     {
       "id": "wonder-bot",
       "name": "Wonder Bot",
-      "category": "Your models",
+      "category": "Science",
       "file": "wonder-bot.glb",
       "height": 1.6,
       "rotation": [0, 0, 0],
@@ -78,7 +80,7 @@ Included sample eka thiyala, `models` array eka athule aluth object ekak add kar
 | `id` | Required, unique, permanent ID. Letters/numbers/`-`/`_` only; letter or number ekakin start karanna. Maximum 60 characters. Example `lion-01`. Existing ID ekak wena model ekakata reuse karanna epa. |
 | `file` | Required, GLB filename relative to `public/models/`. Example `lion.glb` or `animals/lion.glb`. **`public/models/lion.glb` kiyala danna epa.** Absolute/external URLs saha `../` paths reject karanawa. |
 | `name` | Library eke penena name eka; up to 45 characters. Omit kaloth ID eka use wenawa. |
-| `category` | Example `Animals`, `Vehicles`, `Buildings`. New category eka automatically library tab ekak wenawa. Default `Your models`; up to 24 characters. |
+| `category` | Example `Animals`, `Vehicles`, `Buildings`. New category eka automatically library tab ekak wenawa. Default `General`; up to 24 characters. |
 | `height` | Model eke initial fitted height in scene units, default `1.5`, bounded to `0.2–4`. App eka centre karala floor eka matha thiyanawa. Editor Size slider eken object eka thawath resize karanna puluwan. Very flat models fit using a nonzero horizontal extent. |
 | `rotation` | Initial [X, Y, Z] in **degrees**; default `[0, 0, 0]`, each axis bounded to ±360. Lying sideways nam example `[-90, 0, 0]` try karanna. Editor rotation me base orientation ekata add wenawa. |
 | `animate` | Default `true`: first embedded GLB animation eka loop wenawa while editor Play, Preview saha AR. `false` nam embedded clip eka run wenne naha. Float/Spin scene motions separate settings. Clip chooser ekak me version eke naha. |
@@ -86,7 +88,7 @@ Included sample eka thiyala, `models` array eka athule aluth object ekak add kar
 | `background` | Optional thumbnail card background, hex colour. Example `#eef4ea`. |
 | `credit` | Optional model creator/licence note, up to 180 characters; retained in model metadata. Obey the model licence separately; me field eka licence permission ekak nemei. |
 
-`repository` optional root field ekak. Me repository name eka app eke **Model folder / Edit catalogue** GitHub links hadanna use wenawa. Wena repo ekakata fork karoth eya update karanna. E links use karanne `main` branch eka.
+`repository` optional root metadata field ekak. Teacher UI eke model-folder/catalogue-edit links naha; owner instructions repository documentation eke witharai. Fork karoth repository metadata update karanna.
 
 **JSON rules:** double quotes use karanna; entries athara comma ekak danna; anthima entry ekata passe trailing comma ekak danna epa; comments danna epa. Root `"version": 1` thiyanna. Catalogue eka models **100** kata saha roughly **200 KB** ta limit karala thiyenawa. Demo models 12 JSON ekata add karanna one naha.
 
@@ -117,7 +119,7 @@ A laptop/desktop browser eka GitHub folder uploads saha scene editing walata eas
 
 | Problem | Balanna one de |
 | --- | --- |
-| Model library eke penenne naha | Latest Actions run green da? Correct `public/models/catalog.json` da? Search clear karala All/category tab balanna. Hard refresh karanna. **Add your own models** dialog eke catalogue warnings balanna. Invalid entry ekak skip wenna puluwan. |
+| Model library eke penenne naha | Latest Actions run green da? Correct `public/models/catalog.json` da? Search clear karala All/category tab balanna. Hard refresh karanna. Teacher UI shows a generic library notice. Owner widihata catalogue JSON syntax, unique IDs and file paths check karanna. Invalid entry ekak skip wenna puluwan. |
 | `HTTP 404` | Filename/capital letters exact da? GitHub `public/models/` athule file eka thiyenawada? `file` value ekata `public/` prefix dala nadda? Published URL `https://susanthavfx-art.github.io/AR-Web-App/models/lion.glb` browser eken download karala balanna. |
 | Purple loading shape | GLB download/decode wena gaman. Loku file ekak nam optimise karanna. 30-second load/decode timeout ekak thiyenawa. Fix kalata passe refresh karanna. |
 | Red wireframe + error | File missing, damaged, unsupported or not a GLB. Visible error message eka balanna. FBX rename karala GLB karanna ba. Valid GLB 2.0 widihata re-export karanna. |

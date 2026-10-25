@@ -1,8 +1,10 @@
 # Wonderlab — WebAR creation studio
 
+> **Teacher-library update:** Teachers use the owner-provided library and publish scene snapshots. Model-owner buttons/GitHub instructions are not shown in the teacher UI. Wonder Bot is in Science; the owner-provided Velociraptor remains in Animals. See [TEACHER-LIBRARY.md](TEACHER-LIBRARY.md) for installing the patch and adding categories without JavaScript edits.
+
 > **GitHub Pages update:** See [GITHUB-PAGES-SETUP.md](GITHUB-PAGES-SETUP.md) for deploying this repository at `/AR-Web-App/`. The included workflow builds the app and publishes `site/`, not the source repository.
 
-> **GLB library update:** Add your own models through `public/models/catalog.json`. Start with [ADD-MODELS.md](ADD-MODELS.md); one-time patch installation is in [UPDATE-MODEL-LIBRARY.md](UPDATE-MODEL-LIBRARY.md). No backend or JavaScript edits are needed for future catalogue additions.
+> **Owner GLB-library workflow:** Maintain the provided model library through `public/models/catalog.json`. Start with [ADD-MODELS.md](ADD-MODELS.md); one-time patch installation is in [UPDATE-MODEL-LIBRARY.md](UPDATE-MODEL-LIBRARY.md). No backend or JavaScript edits are needed for future catalogue additions.
 
 **A little imagination. A whole new world.**
 
@@ -93,7 +95,6 @@ src/
   App.jsx                       Editor, project management, templates and guides
   components/
     AssetImage.jsx              Reactive/lazy procedural or GLB thumbnails
-    ModelLibraryGuide.jsx       In-app GitHub catalogue instructions
     StudioCanvas.jsx            Three.js workspace, GLBs, orbit and transform controls
     Viewer.jsx                  Published viewer and real MindAR camera tracking
     ShareModal.jsx              Snapshot link, QR and marker publishing flow
@@ -142,7 +143,7 @@ npx playwright install --with-deps chromium
 npm test
 ```
 
-The final GLB-feature production-build suite passed **18 tests** against the strict `/AR-Web-App/` static server (no SPA fallback). See [docs/GLB-LIBRARY-VERIFICATION.md](docs/GLB-LIBRARY-VERIFICATION.md) for the exact scope and results. Earlier MVP and Pages-only records are preserved as historical verification.
+The latest teacher-library production-build suite passed **21 tests** against the strict `/AR-Web-App/` static server (no SPA fallback). See [docs/TEACHER-LIBRARY-VERIFICATION.md](docs/TEACHER-LIBRARY-VERIFICATION.md) for the current scope and results. The earlier 18-case GLB update and MVP/Pages records are preserved as historical verification.
 
 To reproduce the strict production test:
 
@@ -153,7 +154,7 @@ node scripts/serve-pages.mjs
 APP_BASE_PATH=/AR-Web-App/ npx playwright test
 ```
 
-The suite covers catalogue loading/validation/fallback; automatic thumbnails; GLB transforms, saved projects, backups and embedded animation; stable/fresh-phone shares even after catalogue reorder or outage; distinct model definitions in one scene; legacy v1 links; delayed-load disposal and request caching; original Draco/Meshopt/textured/skinned fixtures; and all previous editor, mobile, PDF, routing and camera flows. It runs **actual MindAR detection against each bundled marker using a synthetic camera stream**; the Space explorer scene also includes the animated GLB. Camera tracks are checked after exit.
+The suite verifies that teacher pages have no model-owner controls or Your models tab, new category labels appear automatically, the owner-provided Velociraptor places/shares to a fresh viewer, and missing/legacy categories become General. It also covers catalogue loading/validation/fallback; automatic thumbnails; GLB transforms, saved projects, backups and embedded animation; stable/fresh-phone shares even after catalogue reorder or outage; distinct model definitions in one scene; legacy v1 links; delayed-load disposal and request caching; original Draco/Meshopt/textured/skinned fixtures; and all previous editor, mobile, PDF, routing and camera flows. It runs **actual MindAR detection against each bundled marker using a synthetic camera stream**; the Space explorer scene also includes the animated GLB. Camera tracks are checked after exit.
 
 A synthetic stream exercises real detection and rendering code, but **does not replace physical iPhone/Android testing**. Before classroom use, verify rear-camera selection, permissions, target reacquisition, different viewing angles, lighting, print quality, performance and battery/thermal behaviour on the intended devices.
 
