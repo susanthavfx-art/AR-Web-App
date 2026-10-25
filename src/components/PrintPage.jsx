@@ -2,31 +2,26 @@ import React, { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { ArrowLeft, Download, LoaderCircle, Printer } from "lucide-react";
 import { Logo } from "./UI";
-import { LinkError } from "./Viewer";
-import { projectFromLocation, shareUrl } from "../lib/projects";
+import { LinkError, LoadingLesson, useLocationProject } from "./Viewer";
+import { shareUrl } from "../lib/projects";
 import { getMarker } from "../lib/assets";
 import { markerPdf } from "../lib/pdf";
 export default function PrintPage() {
-  const [result] = useState(() => {
-    try {
-      return { project: projectFromLocation() };
-    } catch (e) {
-      return { error: e.message };
-    }
-  });
+  const result = useLocationProject();
+  if (!result) return <LoadingLesson />;
   return result.error ? (
     <LinkError message={result.error} />
   ) : (
-    <Sheet project={result.project} />
+    <Sheet project={result.project} lesson={result.lesson} />
   );
 }
-function Sheet({ project }) {
+function Sheet({ project, lesson }) {
   const marker = getMarker(project.markerId),
     [qr, setQr] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   useEffect(() => {
-    QRCode.toDataURL(shareUrl(project), {
+    QRCode.toDataURL(shareUrl(project, "view", lesson), {
       width: 600,
       margin: 2,
       errorCorrectionLevel: "L",
@@ -41,7 +36,7 @@ function Sheet({ project }) {
   async function download() {
     setBusy(true);
     try {
-      await markerPdf(project);
+      await markerPdf(project, true, lesson);
     } catch {
       setError(
         "The PDF could not be created. You can use the Print button instead.",
@@ -53,7 +48,10 @@ function Sheet({ project }) {
   return (
     <main className="print-page">
       <div className="print-controls">
-        <a className="button text-button" href={shareUrl(project)}>
+        <a
+          className="button text-button"
+          href={shareUrl(project, "view", lesson)}
+        >
           <ArrowLeft size={16} />
           Back to viewer
         </a>

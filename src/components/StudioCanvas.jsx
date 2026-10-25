@@ -16,6 +16,7 @@ import {
   getMarker,
   tickModel,
 } from "../lib/assets";
+import { CardOverlay, positionCards } from "./LessonCards";
 
 const StudioCanvas = forwardRef(function StudioCanvas(
   {
@@ -30,6 +31,14 @@ const StudioCanvas = forwardRef(function StudioCanvas(
     playing = false,
     viewOnly = false,
     onReady,
+    cards = [],
+    cardMode = "view",
+    onSelectCard,
+    onMoveCard,
+    onOpenCard,
+    pickMode = null,
+    onPickPoint,
+    compactCards = false,
   },
   ref,
 ) {
@@ -37,7 +46,8 @@ const StudioCanvas = forwardRef(function StudioCanvas(
     engine = useRef(null),
     props = useRef({}),
     [error, setError] = useState(""),
-    [modelSummary, setModelSummary] = useState({ loading: 0, errors: [] });
+    [modelSummary, setModelSummary] = useState({ loading: 0, errors: [] }),
+    cardRegistry = useRef({});
   props.current = {
     project,
     selectedId,
@@ -49,6 +59,12 @@ const StudioCanvas = forwardRef(function StudioCanvas(
     markerVisible,
     playing,
     viewOnly,
+    cards,
+    cardMode,
+    onSelectCard,
+    onMoveCard,
+    pickMode,
+    onPickPoint,
   };
   useImperativeHandle(
     ref,
@@ -217,6 +233,63 @@ const StudioCanvas = forwardRef(function StudioCanvas(
       },
     };
     engine.current = e;
+    const cardPlane = new THREE.Plane(),
+      cardHit = new THREE.Vector3();
+    e.startCardDrag = (card, event) => {
+      props.current.onSelectCard?.(card.id);
+      pointerStart = null;
+      if (!event || props.current.cardMode !== "edit") return;
+      event.preventDefault();
+      event.stopPropagation();
+      const normal = camera.getWorldDirection(new THREE.Vector3()).negate();
+      const start = new THREE.Vector3().fromArray(card.position);
+      cardPlane.setFromNormalAndCoplanarPoint(normal, start);
+      pointerFor(event);
+      if (!raycaster.ray.intersectPlane(cardPlane, cardHit)) return;
+      e.cardDrag = {
+        id: card.id,
+        x: event.clientX,
+        y: event.clientY,
+        offset: start.clone().sub(cardHit),
+        position: null,
+      };
+      controls.enabled = false;
+      const move = (ev) => {
+        const drag = e.cardDrag;
+        if (!drag) return;
+        if (
+          !drag.position &&
+          Math.hypot(ev.clientX - drag.x, ev.clientY - drag.y) < 4
+        )
+          return;
+        pointerFor(ev);
+        if (!raycaster.ray.intersectPlane(cardPlane, cardHit)) return;
+        const p = cardHit.clone().add(drag.offset);
+        drag.position = [
+          Math.max(-6, Math.min(6, p.x)),
+          Math.max(-0.5, Math.min(6, p.y)),
+          Math.max(-6, Math.min(6, p.z)),
+        ];
+        needsRender = true;
+      };
+      const end = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", end);
+        window.removeEventListener("pointercancel", end);
+        const drag = e.cardDrag;
+        e.cardDrag = null;
+        controls.enabled = true;
+        if (drag?.position)
+          props.current.onMoveCard?.(
+            drag.id,
+            drag.position.map((v) => Math.round(v * 100) / 100),
+          );
+        needsRender = true;
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", end);
+      window.addEventListener("pointercancel", end);
+    };
     controls.addEventListener("change", () => {
       needsRender = true;
     });
@@ -277,16 +350,34 @@ const StudioCanvas = forwardRef(function StudioCanvas(
       pointerStart = { x: ev.clientX, y: ev.clientY, wasDragging: e.dragging };
     };
     const up = (ev) => {
+      const started = pointerStart;
+      pointerStart = null;
       if (
         props.current.viewOnly ||
-        !pointerStart ||
+        !started ||
         e.dragging ||
-        pointerStart.wasDragging ||
-        Math.hypot(ev.clientX - pointerStart.x, ev.clientY - pointerStart.y) > 5
+        started.wasDragging ||
+        Math.hypot(ev.clientX - started.x, ev.clientY - started.y) > 5
       )
         return;
       if (transform.axis) return;
       pointerFor(ev);
+      if (props.current.pickMode) {
+        const hit = raycaster.intersectObjects(
+          [...models.values()].map((m) => m.group).filter((g) => g.visible),
+          true,
+        )[0];
+        let target = hit?.object;
+        while (target && !target.userData.objectId) target = target.parent;
+        if (hit && target) {
+          const local = target.worldToLocal(hit.point.clone());
+          props.current.onPickPoint?.(
+            target.userData.objectId,
+            local.toArray().map((v) => Math.round(v * 1000) / 1000),
+          );
+        }
+        return;
+      }
       const hits = raycaster.intersectObjects(
         [...models.values()].map((m) => m.group).filter((g) => g.visible),
         true,
@@ -358,7 +449,7 @@ const StudioCanvas = forwardRef(function StudioCanvas(
       const t = (now - start) / 1000;
       controls.update();
       const p = props.current;
-      if (!needsRender && !p.playing && !e.dragging) return;
+      if (!needsRender && !p.playing && !e.dragging && !e.cardDrag) return;
       if (p.playing && !e.dragging) {
         p.project.objects.forEach((o, i) => {
           const m = models.get(o.id)?.group;
@@ -381,6 +472,30 @@ const StudioCanvas = forwardRef(function StudioCanvas(
       }
       if (p.playing || e.dragging) renderer.shadowMap.needsUpdate = true;
       renderer.render(scene, camera);
+      positionCards(
+        cardRegistry,
+        camera,
+        container.clientWidth,
+        container.clientHeight,
+        {
+          card(card, target) {
+            const drag = e.cardDrag;
+            target.fromArray(
+              drag?.id === card.id && drag.position
+                ? drag.position
+                : card.position,
+            );
+            return true;
+          },
+          anchor(card, target) {
+            const group = models.get(card.target.objectId)?.group;
+            if (!group?.visible) return false;
+            group.updateMatrixWorld();
+            group.localToWorld(target.fromArray(card.target.point));
+            return true;
+          },
+        },
+      );
       needsRender = false;
     };
     loop();
@@ -478,6 +593,9 @@ const StudioCanvas = forwardRef(function StudioCanvas(
     viewOnly,
   ]);
   useEffect(() => {
+    engine.current?.requestRender();
+  }, [cards, selectedId, compactCards]);
+  useEffect(() => {
     const e = engine.current;
     if (!e) return;
     let cancelled = false;
@@ -500,7 +618,22 @@ const StudioCanvas = forwardRef(function StudioCanvas(
     };
   }, [project.markerId]);
   return (
-    <div ref={host} className="studio-canvas" data-testid="studio-canvas">
+    <div
+      ref={host}
+      className={`studio-canvas ${pickMode ? "picking-point" : ""}`}
+      data-testid="studio-canvas"
+    >
+      <CardOverlay
+        cards={cards}
+        registry={cardRegistry}
+        mode={cardMode}
+        compact={compactCards}
+        selectedId={selectedId}
+        onCardPointerDown={(card, event) =>
+          engine.current?.startCardDrag(card, event)
+        }
+        onOpen={onOpenCard}
+      />
       {(modelSummary.loading > 0 || modelSummary.errors.length > 0) &&
         !error && (
           <div

@@ -17,6 +17,7 @@ import { Modal } from "./UI";
 import { getMarker } from "../lib/assets";
 import { shareUrl } from "../lib/projects";
 import { markerPdf } from "../lib/pdf";
+import { cloudEnabled, publishLesson, useTeacherSession } from "../lib/cloud";
 
 export default function ShareModal({
   project,
@@ -30,9 +31,34 @@ export default function ShareModal({
     [busy, setBusy] = useState(false),
     [tab, setTab] = useState(printFirst ? "print" : "share"),
     [qrError, setQrError] = useState(false);
-  const link = useMemo(() => shareUrl(project), [project]),
+  const teacher = useTeacherSession(),
+    [lesson, setLesson] = useState(""),
+    [publishing, setPublishing] = useState(() => cloudEnabled() && !!teacher),
+    [publishError, setPublishError] = useState("");
+  useEffect(() => {
+    if (!cloudEnabled() || !teacher) {
+      setPublishing(false);
+      return;
+    }
+    let active = true;
+    setPublishing(true);
+    publishLesson(project)
+      .then((key) => active && setLesson(key))
+      .catch((e) => active && setPublishError(e.message))
+      .finally(() => active && setPublishing(false));
+    return () => {
+      active = false;
+    };
+  }, [project, teacher?.user.id]);
+  const link = useMemo(
+      () => (publishing ? "" : shareUrl(project, "view", lesson)),
+      [project, lesson, publishing],
+    ),
     marker = getMarker(project.markerId);
   useEffect(() => {
+    setQr("");
+    setQrError(false);
+    if (!link) return;
     QRCode.toDataURL(link, {
       width: 440,
       margin: 2,
@@ -57,7 +83,7 @@ export default function ShareModal({
   async function download() {
     setBusy(true);
     try {
-      await markerPdf(project);
+      await markerPdf(project, true, lesson);
       notify("Your marker sheet is ready. Print it in colour at 100%.");
     } catch {
       notify("The PDF could not be created. Try Print sheet instead.", "error");
@@ -113,20 +139,43 @@ export default function ShareModal({
             <div className="share-project-title">
               <h3>{project.title}</h3>
               <p>
-                {project.objects.length} objects · {marker.name}
+                {project.objects.length}{" "}
+                {project.objects.length === 1 ? "object" : "objects"}
+                {project.cards?.length
+                  ? ` · ${project.cards.length} lesson ${project.cards.length === 1 ? "box" : "boxes"}`
+                  : ""}{" "}
+                · {marker.name}
               </p>
             </div>
             <div className="snapshot-note">
               <ShieldCheck size={17} />
               <span>
-                This link shares a snapshot. After editing, make a new link to
-                share your changes.
+                {lesson
+                  ? "Published online as a snapshot. After editing, publish again to share your changes."
+                  : "This link shares a snapshot. After editing, make a new link to share your changes."}
               </span>
             </div>
           </div>
           <div className="share-actions">
+            {publishError && (
+              <p className="publish-note error" role="alert">
+                Online publishing failed: {publishError} The full scene link
+                below still works.
+              </p>
+            )}
+            {!lesson && !publishing && !publishError && cloudEnabled() && (
+              <p className="publish-note">
+                Sign in as a teacher to publish a short, easy-to-scan lesson
+                link.
+              </p>
+            )}
             <div className="qr-block">
-              {qr ? (
+              {publishing ? (
+                <p className="publishing" role="status">
+                  <LoaderCircle className="spin" size={22} />
+                  Publishing your lesson…
+                </p>
+              ) : qr ? (
                 <img
                   src={qr}
                   alt="QR code to open your AR creation on a phone"
@@ -165,7 +214,7 @@ export default function ShareModal({
               </button>
             </div>
             <a
-              href={link}
+              href={link || undefined}
               target="_blank"
               rel="noreferrer"
               className="button primary full"
@@ -222,7 +271,7 @@ export default function ShareModal({
             </ul>
             <button
               className="button primary full"
-              disabled={busy}
+              disabled={busy || publishing}
               onClick={download}
             >
               {busy ? (
@@ -234,7 +283,7 @@ export default function ShareModal({
             </button>
             <a
               className="button secondary full"
-              href={shareUrl(project, "print")}
+              href={link ? shareUrl(project, "print", lesson) : undefined}
               target="_blank"
               rel="noreferrer"
             >
@@ -252,7 +301,11 @@ export default function ShareModal({
       <div className="dialog-footnote">
         <ShieldCheck size={14} />
         No app installation. No camera uploads. Just a little wonder.
-        <span>Demo · Scene data is included in the link</span>
+        <span>
+          {lesson
+            ? "Lesson published online"
+            : "Demo · Scene data is included in the link"}
+        </span>
       </div>
     </Modal>
   );

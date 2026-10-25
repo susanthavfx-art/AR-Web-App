@@ -20,7 +20,8 @@ import {
 } from "lucide-react";
 import StudioCanvas from "./StudioCanvas";
 import { Logo, IconButton } from "./UI";
-import { projectFromLocation } from "../lib/projects";
+import { loadProjectFromLocation } from "../lib/projects";
+import { CardOverlay, LessonCardSheet, positionCards } from "./LessonCards";
 import {
   addLights,
   applyObjectTransform,
@@ -47,21 +48,57 @@ export function LinkError({ message }) {
     </main>
   );
 }
+export function LoadingLesson() {
+  return (
+    <main className="link-error lesson-loading" role="status">
+      <Logo />
+      <LoaderCircle size={34} className="spin" />
+      <h1>Opening your lesson…</h1>
+      <p>Getting the 3D models and lesson boxes ready.</p>
+    </main>
+  );
+}
+// Reads either a full scene link or a short published lesson link.
+export function useLocationProject() {
+  const [result, setResult] = useState(null);
+  useEffect(() => {
+    let active = true;
+    loadProjectFromLocation()
+      .then((value) => active && setResult(value))
+      .catch(
+        (e) =>
+          active &&
+          setResult({ error: e?.message || "This link could not be opened." }),
+      );
+    return () => {
+      active = false;
+    };
+  }, []);
+  return result;
+}
 export default function Viewer() {
-  const [result] = useState(() => {
-    try {
-      return { project: projectFromLocation() };
-    } catch (e) {
-      return { error: e.message };
-    }
-  });
+  const result = useLocationProject();
+  if (!result) return <LoadingLesson />;
   return result.error ? (
     <LinkError message={result.error} />
   ) : (
-    <ViewerExperience project={result.project} />
+    <ViewerExperience project={result.project} lesson={result.lesson} />
   );
 }
-function ViewerExperience({ project }) {
+function useCompact() {
+  const [compact, setCompact] = useState(
+    () => window.matchMedia?.("(max-width: 720px)").matches ?? false,
+  );
+  useEffect(() => {
+    const query = window.matchMedia?.("(max-width: 720px)");
+    if (!query) return;
+    const change = () => setCompact(query.matches);
+    query.addEventListener?.("change", change);
+    return () => query.removeEventListener?.("change", change);
+  }, []);
+  return compact;
+}
+function ViewerExperience({ project, lesson }) {
   const [mode, setMode] = useState("intro"),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(""),
@@ -69,7 +106,11 @@ function ViewerExperience({ project }) {
     [ready, setReady] = useState(false),
     [tips, setTips] = useState(false),
     [busy, setBusy] = useState(false),
-    [scale, setScale] = useState(1);
+    [scale, setScale] = useState(1),
+    [openCard, setOpenCard] = useState(null);
+  const cards = project.cards || [],
+    compact = useCompact(),
+    arCards = useRef({});
   const cameraHost = useRef(null),
     ar = useRef(null),
     content = useRef(null),
@@ -252,6 +293,31 @@ function ViewerExperience({ project }) {
               model.rotation.y = (o.rotation[1] * Math.PI) / 180 + t * 0.28;
           });
           mindar.renderer.render(mindar.scene, mindar.camera);
+          if (cards.length && anchor.group.visible) {
+            const host = cameraHost.current;
+            positionCards(
+              arCards,
+              mindar.camera,
+              host?.clientWidth || 0,
+              host?.clientHeight || 0,
+              {
+                card(card, target) {
+                  contentGroup.localToWorld(target.fromArray(card.position));
+                  return true;
+                },
+                anchor(card, target) {
+                  const index = project.objects.findIndex(
+                    (o) => o.id === card.target.objectId,
+                  );
+                  const model = contentGroup.children[index];
+                  if (!model?.visible) return false;
+                  model.localToWorld(target.fromArray(card.target.point));
+                  return true;
+                },
+              },
+              { top: 92, bottom: 96 },
+            );
+          }
         });
       } catch (e) {
         if (disposed) return;
@@ -295,7 +361,7 @@ function ViewerExperience({ project }) {
   async function download() {
     setBusy(true);
     try {
-      await markerPdf(project);
+      await markerPdf(project, true, lesson);
     } catch {
       setError("The marker PDF could not be created. Please try again.");
     } finally {
@@ -306,6 +372,20 @@ function ViewerExperience({ project }) {
     return (
       <main className="ar-experience">
         <div ref={cameraHost} className="ar-camera" />
+        {cards.length > 0 && (
+          <div className="ar-card-host">
+            <CardOverlay
+              cards={cards}
+              registry={arCards}
+              compact={compact}
+              hidden={!tracking}
+              onOpen={setOpenCard}
+            />
+          </div>
+        )}
+        {openCard && (
+          <LessonCardSheet card={openCard} onClose={() => setOpenCard(null)} />
+        )}
         <div className="ar-top">
           <IconButton
             className="ar-control"
@@ -406,7 +486,15 @@ function ViewerExperience({ project }) {
       </header>
       <div className="viewer-main">
         <div className="viewer-scene">
-          <StudioCanvas project={project} viewOnly playing grid={false} />
+          <StudioCanvas
+            project={project}
+            viewOnly
+            playing
+            grid={false}
+            cards={cards}
+            compactCards={compact}
+            onOpenCard={setOpenCard}
+          />
           <span className="viewer-scene-badge">
             <Box size={14} />
             {mode === "3d"
@@ -426,7 +514,9 @@ function ViewerExperience({ project }) {
           </span>
           <h1>{project.title}</h1>
           <p className="viewer-description">
-            There’s a whole little world waiting to step off your screen.
+            {cards.length
+              ? `Tap the ${cards.length === 1 ? "lesson box" : `${cards.length} lesson boxes`} to read, listen, watch or open links.`
+              : "There’s a whole little world waiting to step off your screen."}
           </p>
           {error && (
             <div className="camera-error" role="alert">
@@ -494,6 +584,9 @@ function ViewerExperience({ project }) {
           </div>
         </div>
       </div>
+      {openCard && (
+        <LessonCardSheet card={openCard} onClose={() => setOpenCard(null)} />
+      )}
       <footer className="viewer-footer">
         <Logo small />
         <span>Made for little big thinkers.</span>
