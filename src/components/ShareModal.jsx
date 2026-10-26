@@ -13,7 +13,7 @@ import {
   Smartphone,
   Sparkles,
 } from "lucide-react";
-import { Modal } from "./UI";
+import { BRAND_MARK, BRAND_NAME, Modal } from "./UI";
 import { getMarker } from "../lib/assets";
 import { shareUrl } from "../lib/projects";
 import { markerPdf } from "../lib/pdf";
@@ -235,7 +235,10 @@ export default function ShareModal({
       ) : (
         <div className="print-dialog-grid">
           <div className="mini-sheet">
-            <div className="mini-sheet-brand">wonderlab.</div>
+            <div className="mini-sheet-brand">
+              <img src={BRAND_MARK} alt="" />
+              {BRAND_NAME}
+            </div>
             <strong>{project.title}</strong>
             <img
               className="sheet-marker"

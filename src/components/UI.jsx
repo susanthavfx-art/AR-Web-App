@@ -1,18 +1,18 @@
 import React, { useEffect, useRef } from "react";
 import { X } from "lucide-react";
-export function Logo({ small = false }) {
+import { publicUrl } from "../lib/deployment";
+// Company logo files live in public/brand. Replace those PNGs to rebrand.
+export const BRAND_NAME = "WonderLab Studio";
+export const BRAND_MARK = publicUrl("brand/wonderlab-mark-256.png");
+export const BRAND_LOGO = publicUrl("brand/wonderlab-logo-512.png");
+export function Logo({ small = false, full = false }) {
+  if (full)
+    return <img className="brand-full" src={BRAND_LOGO} alt={BRAND_NAME} />;
   return (
     <span className={`brand ${small ? "brand-small" : ""}`}>
-      <span className="brand-icon">
-        <svg viewBox="0 0 40 40" aria-hidden="true">
-          <path
-            d="M10 7c6-3 10 3 10 9 0-6 6-12 11-7 5 6-1 11-7 11 6 0 12 6 7 11-6 5-11-1-11-7 0 6-6 12-11 7-5-6 1-11 7-11-6 0-12-6-6-13Z"
-            fill="currentColor"
-          />
-        </svg>
-      </span>
-      <span>
-        wonderlab<span className="brand-dot">.</span>
+      <img className="brand-mark" src={BRAND_MARK} alt="" />
+      <span className="brand-word">
+        Wonder<span className="brand-lab">Lab</span>
       </span>
     </span>
   );

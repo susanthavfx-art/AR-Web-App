@@ -35,7 +35,7 @@ import { markerPdf } from "../lib/pdf";
 export function LinkError({ message }) {
   return (
     <main className="link-error">
-      <Logo />
+      <Logo full />
       <span className="link-error-icon">
         <ScanLine size={42} />
       </span>
@@ -51,7 +51,7 @@ export function LinkError({ message }) {
 export function LoadingLesson() {
   return (
     <main className="link-error lesson-loading" role="status">
-      <Logo />
+      <Logo full />
       <LoaderCircle size={34} className="spin" />
       <h1>Opening your lesson…</h1>
       <p>Getting the 3D models and lesson boxes ready.</p>
