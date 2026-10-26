@@ -1,5 +1,7 @@
 # Wonderlab — WebAR creation studio
 
+> **Company logo:** The WonderLab Studio logo files are in `public/brand/` (`wonderlab-mark-256.png` = small round mark for the header, PDF and share sheet; `wonderlab-logo-512.png` = full logo for loading/error screens) plus `public/favicon.png` and `public/apple-touch-icon.png`. To change the logo later, replace these PNGs with files of the same name and size.
+
 > **Marker maker update:** Teachers can make their **own marker** from a photo and a short title, check its tracking quality, and use a different marker in each project. Saving needs the same Supabase project as lesson boxes plus a one-time storage update. See [MARKER-MAKER.md](MARKER-MAKER.md).
 
 > **Lesson boxes update:** Teachers can add **Text, Audio (voice recording/upload), Video and Link boxes** beside models, point them to model parts and publish them to the viewer and phone AR. Audio/video uploads and short QR links use an optional Supabase project. See [LESSON-BOXES.md](LESSON-BOXES.md).
