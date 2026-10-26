@@ -1,6 +1,18 @@
 import QRCode from "qrcode";
 import { getMarker } from "./assets";
 import { shareUrl, slug } from "./projects";
+import { publicUrl } from "./deployment";
+async function dataUrl(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Logo missing");
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
 export async function markerPdf(project, save = true, lesson = "") {
   const { jsPDF } = await import("jspdf");
   const marker = getMarker(project.markerId),
@@ -19,15 +31,14 @@ export async function markerPdf(project, save = true, lesson = "") {
     f.readAsDataURL(blob);
   });
   const pdf = new jsPDF({ unit: "mm", format: "a4", compress: true });
-  pdf.setFillColor("#7860db");
-  pdf.roundedRect(18, 16, 10, 10, 3, 3, "F");
-  pdf.setTextColor("#ffffff");
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(16);
-  pdf.text("w", 20.8, 23.2);
+  const mark = await dataUrl(publicUrl("brand/wonderlab-mark-256.png")).catch(
+    () => "",
+  );
+  if (mark) pdf.addImage(mark, "PNG", 17, 14.5, 12, 12);
   pdf.setTextColor("#292437");
-  pdf.setFontSize(20);
-  pdf.text("wonderlab.", 32, 23.5);
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(19);
+  pdf.text("WonderLab Studio", mark ? 32 : 18, 23.2);
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(9);
   pdf.setTextColor("#827b92");
