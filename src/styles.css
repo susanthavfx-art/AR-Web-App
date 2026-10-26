@@ -144,36 +144,37 @@ input::-webkit-inner-spin-button {
   white-space: nowrap;
   color: #383047;
 }
-.brand-icon {
-  width: 36px;
-  height: 36px;
-  background: #8065d2;
-  border-radius: 12px;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transform: rotate(-5deg);
+.brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex: none;
+  display: block;
+  box-shadow: 0 3px 8px #1b123026;
 }
-.brand-icon svg {
-  width: 29px;
-  height: 29px;
+.brand-word {
+  color: #2d2440;
 }
-.brand-dot {
-  color: #6846b0;
+.brand-lab {
+  background: linear-gradient(90deg, #ff9a1f 0%, #ff5f6d 55%, #d63cf0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .brand-small {
   font-size: 22px;
   gap: 8px;
 }
-.brand-small .brand-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
+.brand-small .brand-mark {
+  width: 32px;
+  height: 32px;
 }
-.brand-small .brand-icon svg {
-  width: 25px;
-  height: 25px;
+.brand-full {
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  display: block;
+  box-shadow: 0 8px 24px #1b123033;
 }
 .icon-button {
   display: inline-flex;
@@ -320,7 +321,7 @@ input::-webkit-inner-spin-button {
   font-size: 7px;
   letter-spacing: 2px;
   color: #7b6f8b;
-  padding-left: 47px;
+  padding-left: 51px;
   font-weight: 600;
   line-height: 1;
 }
@@ -2622,7 +2623,10 @@ input::-webkit-inner-spin-button {
   margin: 0 auto;
 }
 .mini-sheet-brand {
-  color: #9272af;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #2d2440;
   font-family: var(--heading);
   font-size: 13px;
   font-weight: 700;
@@ -3214,14 +3218,9 @@ input::-webkit-inner-spin-button {
   font-size: 16px;
   gap: 7px;
 }
-.viewer-footer .brand-icon {
-  width: 23px;
-  height: 23px;
-  border-radius: 7px;
-}
-.viewer-footer .brand-icon > svg {
-  width: 19px;
-  height: 19px;
+.viewer-footer .brand-mark {
+  width: 24px;
+  height: 24px;
 }
 .viewer-footer > span {
   font-size: 8px;
@@ -4200,10 +4199,9 @@ input::-webkit-inner-spin-button {
     font-size: 23px;
     gap: 8px;
   }
-  .brand-icon {
+  .brand-mark {
     width: 33px;
     height: 33px;
-    border-radius: 11px;
   }
   .brand-descriptor {
     padding-left: 41px;
@@ -4459,13 +4457,9 @@ input::-webkit-inner-spin-button {
   .print-sheet-header > .brand {
     font-size: 19px;
   }
-  .print-sheet-header > .brand .brand-icon {
+  .print-sheet-header > .brand .brand-mark {
     width: 27px;
     height: 27px;
-    border-radius: 9px;
-  }
-  .print-sheet-header > .brand .brand-icon > svg {
-    width: 22px;
   }
   .print-sheet-header > span {
     font-size: 5px;
@@ -4558,14 +4552,9 @@ input::-webkit-inner-spin-button {
     gap: 7px;
     letter-spacing: -1px;
   }
-  .brand-icon {
+  .brand-mark {
     width: 29px;
     height: 29px;
-    border-radius: 9px;
-  }
-  .brand-icon > svg {
-    width: 24px;
-    height: 24px;
   }
   .brand-descriptor {
     display: none;
@@ -5356,10 +5345,9 @@ input::-webkit-inner-spin-button {
   .viewer-header .brand {
     font-size: 20px;
   }
-  .viewer-header .brand-icon {
+  .viewer-header .brand-mark {
     width: 28px;
     height: 28px;
-    border-radius: 9px;
   }
   .viewer-top-badge {
     font-size: 6px;
@@ -5536,13 +5524,9 @@ input::-webkit-inner-spin-button {
     font-size: 16px;
     gap: 5px;
   }
-  .print-sheet-header > .brand .brand-icon {
+  .print-sheet-header > .brand .brand-mark {
     width: 23px;
     height: 23px;
-    border-radius: 7px;
-  }
-  .print-sheet-header > .brand .brand-icon > svg {
-    width: 20px;
   }
   .print-sheet-header > span {
     font-size: 3.5px;
@@ -5626,14 +5610,9 @@ input::-webkit-inner-spin-button {
     font-size: 23px;
     gap: 10px;
   }
-  .print-sheet-header > .brand .brand-icon {
+  .print-sheet-header > .brand .brand-mark {
     width: 34px;
     height: 34px;
-    border-radius: 11px;
-  }
-  .print-sheet-header > .brand .brand-icon > svg {
-    width: 28px;
-    height: 28px;
   }
   .print-sheet-header > span {
     font-size: 7px;
@@ -7537,4 +7516,10 @@ textarea.text-input {
   .mm-actions > .button {
     flex: 1 1 100%;
   }
+}
+
+.mini-sheet-brand img {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
 }

@@ -13,7 +13,7 @@ function Bootstrap() {
   if (!ready)
     return (
       <main className="library-boot">
-        <Logo />
+        <Logo full />
         <LoaderCircle size={24} className="spin" />
         <p>Opening your creative toolbox…</p>
       </main>
