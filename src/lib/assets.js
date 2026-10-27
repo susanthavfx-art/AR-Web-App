@@ -200,8 +200,49 @@ export function registerSharedModel(input) {
   if (!existing) sharedModels.set(asset.id, asset);
   return asset;
 }
+// Library markers: image + .mind pairs the owner uploads to public/markers.
+// The build lists them in markers/index.json (see scripts/marker-library.mjs).
+const LIBRARY_MARKER_ID = /^[a-z0-9][a-z0-9-]{0,47}$/;
+const LIBRARY_FILE = /^[\w .()-]{1,120}$/;
+const markerFile = (file) => publicUrl(`markers/${encodeURIComponent(file)}`);
+export async function loadMarkerLibrary() {
+  try {
+    const response = await fetch(publicUrl("markers/index.json"), {
+      cache: "no-cache",
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    const added = [];
+    for (const m of Array.isArray(data?.markers) ? data.markers.slice(0, 60) : []) {
+      if (
+        !m ||
+        !LIBRARY_MARKER_ID.test(m.id) ||
+        MARKERS.some((x) => x.id === m.id) ||
+        !LIBRARY_FILE.test(m.image) ||
+        !/\.(jpe?g|png|webp)$/i.test(m.image) ||
+        !LIBRARY_FILE.test(m.target) ||
+        !/\.mind$/i.test(m.target)
+      )
+        continue;
+      const marker = {
+        id: m.id,
+        name: String(m.name || m.id).slice(0, 40),
+        subtitle: String(m.subtitle || "From the marker library").slice(0, 60),
+        image: markerFile(m.image),
+        target: markerFile(m.target),
+        color: /^#[0-9a-f]{6}$/i.test(m.color) ? m.color : "#f1ece4",
+        library: true,
+      };
+      MARKERS.push(marker);
+      added.push(marker);
+    }
+    return added;
+  } catch {
+    return [];
+  }
+}
 export async function initialiseLibrary() {
-  const models = await fetchCatalogue();
+  const [models] = await Promise.all([fetchCatalogue(), loadMarkerLibrary()]);
   for (const asset of models)
     if (!ASSETS.some((a) => a.id === asset.id)) ASSETS.push(asset);
   return models;

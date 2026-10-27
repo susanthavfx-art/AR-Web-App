@@ -232,7 +232,12 @@ export function encodeScene(project) {
   const compact = {
     v: 2,
     n: p.title,
-    m: MARKERS.findIndex((m) => m.id === p.markerId),
+    // Built-in markers keep their old index; library markers travel by id so
+    // links survive the owner adding or reordering marker files.
+    m: Math.max(0, Math.min(1, MARKERS.findIndex((m) => m.id === p.markerId))),
+    ...(MARKERS.findIndex((m) => m.id === p.markerId) > 1
+      ? { g: p.markerId }
+      : {}),
     ...(p.marker
       ? { k: [p.marker.id, p.marker.name, p.marker.image, p.marker.target] }
       : {}),
@@ -295,7 +300,11 @@ export function decodeScene(encoded) {
   const objectIds = data.o.map(() => crypto.randomUUID());
   return validateProject({
     title: data.n,
-    markerId: Array.isArray(data.k) ? data.k[0] : MARKERS[data.m]?.id,
+    markerId: Array.isArray(data.k)
+      ? data.k[0]
+      : typeof data.g === "string" && MARKERS.some((m) => m.id === data.g)
+        ? data.g
+        : MARKERS[data.m]?.id,
     ...(Array.isArray(data.k)
       ? {
           marker: {
