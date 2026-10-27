@@ -173,3 +173,16 @@ A synthetic stream exercises real detection and rendering code, but **does not r
 5. Add Sinhala/English localisation, accessibility review, monitoring and a physical-device/browser test matrix.
 
 This is an original implementation of the requested workflow, not a copy of Assemblr's code, branding or content. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for software and asset notes.
+
+## Play buttons (model animations and sounds)
+
+Select an object, then open **Play buttons** in the inspector:
+
+- **Main animation**: for GLB models with animations, choose which clip loops all the time, or choose *Stand still*.
+- **Add play button** (up to 6 per object). Each button has:
+  - a name;
+  - a movement: one of the model's own animation clips (each clip can have its own button), or a simple movement (Jump, Spin around, Grow and shrink, Wiggle);
+  - an optional sound (upload an MP3/M4A/WAV or record a voice; teacher sign-in is required).
+- **Keep playing until tapped again** loops a clip until the button is tapped a second time.
+
+Students see the buttons in the 3D viewer and in the AR camera view. Tapping the model plays button 1. Sounds are stored in the `lesson-media` bucket under `audio/`, so no Supabase changes are needed. Short lesson links and inline `#scene=` links both include the buttons, and old links still open.
