@@ -5,6 +5,10 @@ const catalogue = JSON.parse(
   await fs.readFile("public/models/catalog.json", "utf8"),
 );
 const sample = catalogue.models.find((model) => model.id === "wonder-bot");
+// The owner may rename categories in catalog.json (e.g. Animals -> Dinosaurs).
+const dinoCategory =
+  catalogue.models.find((model) => model.id === "Velociraptor-01")?.category ||
+  "Animals";
 const errorsFor = (page) => {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -37,7 +41,7 @@ test("teacher library has no owner controls or Your models tab; the owner's uplo
   await page.goto(appPath);
   const tabs = page.locator(".category-tabs");
   await expect(
-    tabs.getByRole("button", { name: "Animals", exact: true }),
+    tabs.getByRole("button", { name: dinoCategory, exact: true }),
   ).toBeVisible();
   await expect(
     tabs.getByRole("button", { name: "Your models", exact: true }),
@@ -62,7 +66,7 @@ test("teacher library has no owner controls or Your models tab; the owner's uplo
       exact: true,
     }),
   ).toBeVisible();
-  await tabs.getByRole("button", { name: "Animals", exact: true }).click();
+  await tabs.getByRole("button", { name: dinoCategory, exact: true }).click();
   const dinosaur = page.getByRole("button", {
     name: "Add Velociraptor to your scene",
     exact: true,
@@ -138,7 +142,7 @@ test("a new catalogue category appears alongside Space, Nature, Science and Anim
     "Space",
     "Nature",
     "Science",
-    "Animals",
+    dinoCategory,
     "Vehicles",
   ])
     expect(labels).toContain(category);
