@@ -72,6 +72,7 @@ import Viewer from "./components/Viewer";
 import PrintPage from "./components/PrintPage";
 import ShareModal from "./components/ShareModal";
 import MarkerMaker from "./components/MarkerMaker";
+import { ActionEditor } from "./components/ModelActions";
 import { loadMyMarkers, saveMyMarkers } from "./lib/marker-maker";
 import {
   CardProperties,
@@ -1050,6 +1051,10 @@ function StudioApp() {
                   grid={grid}
                   markerVisible={markerVisible}
                   playing={playing}
+                  showActions={playing}
+                  onSoundError={() =>
+                    notify("This sound could not play. Check the file.")
+                  }
                   cards={cards}
                   cardMode="edit"
                   onSelectCard={selectCard}
@@ -1243,6 +1248,16 @@ function StudioApp() {
                       update={(patch) => updateObject(selected.id, patch)}
                       onDelete={() => deleteObject()}
                       onDuplicate={duplicateObject}
+                      onTestAction={(action) => {
+                        const result = canvas.current?.playAction(
+                          selected.id,
+                          action,
+                        );
+                        if (result === "loop")
+                          notify("Playing on repeat. Tap ▶ again to stop.");
+                      }}
+                      onSignIn={() => setDialog("signin")}
+                      notify={notify}
                     />
                   ) : (
                     <div className="no-selection">
@@ -1416,6 +1431,7 @@ function StudioApp() {
               project={project}
               viewOnly
               playing
+              showActions
               grid={false}
               cards={cards}
               onOpenCard={setPreviewCard}
@@ -1547,7 +1563,15 @@ function StudioApp() {
     </div>
   );
 }
-function ObjectProperties({ object, update, onDelete, onDuplicate }) {
+function ObjectProperties({
+  object,
+  update,
+  onDelete,
+  onDuplicate,
+  onTestAction,
+  onSignIn,
+  notify,
+}) {
   const a = getAsset(object.assetId, object.model);
   function vector(field, i, value) {
     if (value === "") return;
@@ -1718,6 +1742,13 @@ function ObjectProperties({ object, update, onDelete, onDuplicate }) {
           Hit play below your canvas to see the magic.
         </p>
       </section>
+      <ActionEditor
+        object={object}
+        update={update}
+        onTest={onTestAction}
+        onSignIn={onSignIn}
+        notify={notify}
+      />
     </>
   );
 }
@@ -1760,6 +1791,9 @@ function SceneObjects({
                 <small>
                   {getAsset(o.assetId, o.model).category}
                   {o.animation !== "none" ? ` · ${o.animation}` : ""}
+                  {o.actions?.length
+                    ? ` · ${o.actions.length} play button${o.actions.length === 1 ? "" : "s"}`
+                    : ""}
                 </small>
               </span>
             </button>
