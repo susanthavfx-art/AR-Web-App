@@ -1,7 +1,8 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import markerLibrary from "./scripts/marker-library.mjs";
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), markerLibrary()],
   base: process.env.VITE_BASE_PATH || "/",
   server: { host: "0.0.0.0", port: 5173, strictPort: true, allowedHosts: true },
   preview: { host: "0.0.0.0", port: 5173, allowedHosts: true },

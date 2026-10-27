@@ -186,3 +186,17 @@ Select an object, then open **Play buttons** in the inspector:
 - **Keep playing until tapped again** loops a clip until the button is tapped a second time.
 
 Students see the buttons in the 3D viewer and in the AR camera view. Tapping the model plays button 1. Sounds are stored in the `lesson-media` bucket under `audio/`, so no Supabase changes are needed. Short lesson links and inline `#scene=` links both include the buttons, and old links still open.
+
+## Adding a marker to the library
+
+1. Make the `.mind` file from your image (for example with the MindAR online compiler).
+2. Upload **both** files with the same name to `public/markers/`, for example `Stegosaurus.jpg` and `Stegosaurus.mind`.
+3. Wait for the GitHub Pages build to finish. The marker then appears in the **Markers** tab.
+
+The build creates `markers/index.json` automatically, so no code changes are needed. To set a nicer name, subtitle or order, you can optionally add `public/markers/markers.json`:
+
+```json
+{ "markers": [ { "file": "Stegosaurus", "name": "Stegosaurus", "subtitle": "Dinosaur world", "order": 1 } ] }
+```
+
+Use only letters, numbers, spaces, `-` and `_` in file names, and keep the images under about 1 MB so they load quickly on phones.
