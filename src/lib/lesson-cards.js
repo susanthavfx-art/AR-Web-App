@@ -100,7 +100,7 @@ export function linkHost(value) {
   }
 }
 
-function validateMedia(media, type) {
+export function validateMedia(media, type) {
   if (!media || typeof media !== "object") return null;
   const url = safeHttpsUrl(media.url);
   if (!url) return null;

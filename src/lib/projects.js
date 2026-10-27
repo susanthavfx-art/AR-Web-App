@@ -12,6 +12,12 @@ import {
 } from "./assets";
 import { decodeCards, encodeCards, validateCards } from "./lesson-cards";
 import { fetchLesson, validLessonKey } from "./cloud";
+import {
+  decodeObjectActions,
+  encodeObjectActions,
+  validIdleClip,
+  validateActions,
+} from "./model-actions";
 
 export const STORAGE_KEY = "wonderlab.projects.v1";
 export const ACTIVE_KEY = "wonderlab.active.v1";
@@ -168,6 +174,12 @@ export function validateProject(input) {
           ...(typeof o.color === "string" && /^#[0-9a-f]{6}$/i.test(o.color)
             ? { color: o.color }
             : {}),
+          ...(validIdleClip(o.idleClip) !== undefined
+            ? { idleClip: o.idleClip }
+            : {}),
+          ...(Array.isArray(o.actions) && o.actions.length
+            ? { actions: validateActions(o.actions) }
+            : {}),
         };
       }),
   };
@@ -248,6 +260,8 @@ export function encodeScene(project) {
     }),
   };
   if (p.cards.length) compact.c = encodeCards(p.cards, p.objects);
+  const actions = encodeObjectActions(p.objects);
+  if (actions.length) compact.x = actions;
   return LZString.compressToEncodedURIComponent(JSON.stringify(compact));
 }
 export function decodeScene(encoded) {
@@ -293,7 +307,7 @@ export function decodeScene(encoded) {
         }
       : {}),
     cards: decodeCards(data.c, objectIds),
-    objects: data.o.map((row, index) => {
+    objects: decodeObjectActions(data.x, data.o.map((row, index) => {
       if (!Array.isArray(row))
         throw new Error("A scene object could not be read.");
       const id =
@@ -332,7 +346,7 @@ export function decodeScene(encoded) {
         name: row[10] || asset?.name,
         color: row[11],
       };
-    }),
+    })),
   });
 }
 // Short lesson links load a published snapshot from the optional cloud store.

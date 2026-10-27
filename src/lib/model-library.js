@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { applyIdleClip } from "./model-actions";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { clone as cloneSkeleton } from "three/addons/utils/SkeletonUtils.js";
@@ -194,7 +195,7 @@ function gltfLoader() {
   }
   return loader;
 }
-function loadModel(asset) {
+export function loadModel(asset) {
   if (!requests.has(asset.modelUrl)) {
     setStatus(asset, "loading");
     const promise = schedule(async () => {
@@ -337,11 +338,14 @@ export function createGLBModel(asset, tint) {
       group.userData.modelReady = true;
       setStatus(asset, "ready");
       group.userData.animationCount = gltf.animations.length;
-      if (asset.model.animate && gltf.animations.length) {
-        const mixer = new THREE.AnimationMixer(model);
-        mixer.clipAction(gltf.animations[0]).play();
-        group.userData.mixer = mixer;
+      group.userData.clips = gltf.animations;
+      group.userData.autoAnimate = !!asset.model.animate;
+      if (gltf.animations.length) {
+        // A mixer is kept for every animated GLB so teachers' play buttons can
+        // run any clip, even when the owner turned automatic animation off.
+        group.userData.mixer = new THREE.AnimationMixer(model);
         group.userData.mixerRoot = model;
+        applyIdleClip(group);
       }
       return group;
     })
@@ -366,4 +370,17 @@ export function catalogueRepositoryUrl(file = "") {
   return file
     ? `${root}/edit/main/public/models/catalog.json`
     : `${root}/tree/main/public/models`;
+}
+
+export function clipLabel(clip, index) {
+  const name = String(clip?.name || "")
+    .replace(/[_|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return name ? name.slice(0, 40) : `Animation ${index + 1}`;
+}
+export async function modelClipNames(asset) {
+  if (!asset?.model) return [];
+  const gltf = await loadModel(asset);
+  return gltf.animations.map(clipLabel);
 }

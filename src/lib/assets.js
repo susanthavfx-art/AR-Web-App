@@ -1,6 +1,7 @@
 import { createGLBModel, fetchCatalogue, modelAsset } from "./model-library";
 export { catalogue, tickModel } from "./model-library";
 import { publicUrl } from "./deployment";
+import { disposeActions } from "./model-actions";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
@@ -656,6 +657,7 @@ export function applyObjectTransform(group, object) {
   group.userData.objectId = object.id;
 }
 export function disposeGroup(group) {
+  disposeActions(group);
   group.traverse((o) => {
     o.userData.disposed = true;
     if (o.userData.mixer) {
