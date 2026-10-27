@@ -934,7 +934,11 @@ function StudioApp() {
                         );
                       }}
                     >
-                      <img src={m.image} alt={`${m.name} tracking image`} />
+                      <img
+                        src={m.image}
+                        alt={`${m.name} tracking image`}
+                        loading="lazy"
+                      />
                       <span className="marker-card-info">
                         <strong>{m.name}</strong>
                         <small>{m.subtitle}</small>
