@@ -465,7 +465,17 @@ const sizeText = (bytes) =>
     ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
     : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
-function MediaField({ kind, media, onChange, onSignIn, notify }) {
+export function MediaField({
+  kind,
+  media,
+  onChange,
+  onSignIn,
+  notify,
+  title,
+  previewLabel,
+  doneMessage,
+  note = "Students can open uploaded files from the published link.",
+}) {
   const session = useTeacherSession();
   const [progress, setProgress] = useState(null),
     [error, setError] = useState(""),
@@ -487,9 +497,10 @@ function MediaField({ kind, media, onChange, onSignIn, notify }) {
       });
       onChange({ ...result, ...extra, ...(duration ? { duration } : {}) });
       notify(
-        kind === "audio"
-          ? "Audio added to your box."
-          : "Video added to your box.",
+        doneMessage ||
+          (kind === "audio"
+            ? "Audio added to your box."
+            : "Video added to your box."),
       );
       setRecording(false);
     } catch (e) {
@@ -504,7 +515,7 @@ function MediaField({ kind, media, onChange, onSignIn, notify }) {
       <div className="property-section-heading">
         <h3>
           <Icon size={14} />
-          {kind === "audio" ? "Voice or audio" : "Video"}
+          {title || (kind === "audio" ? "Voice or audio" : "Video")}
         </h3>
         {media && (
           <button onClick={() => onChange(null)}>
@@ -520,7 +531,7 @@ function MediaField({ kind, media, onChange, onSignIn, notify }) {
               controls
               preload="metadata"
               src={media.url}
-              aria-label="Box audio preview"
+              aria-label={previewLabel || "Box audio preview"}
             />
           ) : (
             <video
@@ -632,7 +643,7 @@ function MediaField({ kind, media, onChange, onSignIn, notify }) {
         {kind === "audio"
           ? `MP3, M4A, WAV or WebM up to ${AUDIO_LIMIT / 1024 / 1024} MB. Recordings up to 5 minutes.`
           : `MP4 (H.264) plays on most phones. Up to ${VIDEO_LIMIT / 1024 / 1024} MB.`}{" "}
-        Students can open uploaded files from the published link.
+        {note}
       </p>
     </section>
   );

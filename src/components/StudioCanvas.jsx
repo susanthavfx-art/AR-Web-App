@@ -16,7 +16,16 @@ import {
   getMarker,
   tickModel,
 } from "../lib/assets";
+import {
+  actionOffsets,
+  isActing,
+  playAction,
+  setIdleClip,
+  stopActions,
+  validIdleClip,
+} from "../lib/model-actions";
 import { CardOverlay, positionCards } from "./LessonCards";
+import { ActionBar } from "./ModelActions";
 
 const StudioCanvas = forwardRef(function StudioCanvas(
   {
@@ -39,6 +48,8 @@ const StudioCanvas = forwardRef(function StudioCanvas(
     pickMode = null,
     onPickPoint,
     compactCards = false,
+    showActions = false,
+    onSoundError,
   },
   ref,
 ) {
@@ -47,6 +58,7 @@ const StudioCanvas = forwardRef(function StudioCanvas(
     props = useRef({}),
     [error, setError] = useState(""),
     [modelSummary, setModelSummary] = useState({ loading: 0, errors: [] }),
+    [looping, setLooping] = useState({}),
     cardRegistry = useRef({});
   props.current = {
     project,
@@ -65,7 +77,26 @@ const StudioCanvas = forwardRef(function StudioCanvas(
     onMoveCard,
     pickMode,
     onPickPoint,
+    showActions,
+    onSoundError,
   };
+  function runAction(objectId, action) {
+    const e = engine.current;
+    const group = e?.models.get(objectId)?.group;
+    if (!group || !action) return "none";
+    const result = playAction(group, action, (error) =>
+      props.current.onSoundError?.(error, action),
+    );
+    setLooping((current) => {
+      const next = { ...current };
+      if (result === "loop") next[objectId] = action.id;
+      else delete next[objectId];
+      return next;
+    });
+    e.requestRender();
+    return result;
+  }
+  props.current.runAction = runAction;
   useImperativeHandle(
     ref,
     () => ({
@@ -90,6 +121,13 @@ const StudioCanvas = forwardRef(function StudioCanvas(
         d.clampLength(4, 29);
         e.camera.position.copy(e.controls.target).add(d);
         e.controls.update();
+      },
+      playAction(objectId, action) {
+        return props.current.runAction(objectId, action);
+      },
+      stopActions() {
+        engine.current?.models.forEach((m) => stopActions(m.group));
+        setLooping({});
       },
       capture() {
         try {
@@ -349,9 +387,35 @@ const StudioCanvas = forwardRef(function StudioCanvas(
     const down = (ev) => {
       pointerStart = { x: ev.clientX, y: ev.clientY, wasDragging: e.dragging };
     };
+    const tapAction = (ev) => {
+      const p = props.current;
+      if (!p.showActions || !(p.viewOnly || p.playing)) return false;
+      pointerFor(ev);
+      const hit = raycaster.intersectObjects(
+        [...models.values()].map((m) => m.group).filter((g) => g.visible),
+        true,
+      )[0];
+      let target = hit?.object;
+      while (target && !target.userData.objectId) target = target.parent;
+      const object = p.project.objects.find(
+        (o) => o.id === target?.userData.objectId,
+      );
+      if (!object?.actions?.length) return false;
+      p.runAction(object.id, object.actions[0]);
+      return true;
+    };
     const up = (ev) => {
       const started = pointerStart;
       pointerStart = null;
+      if (
+        started &&
+        !e.dragging &&
+        !started.wasDragging &&
+        Math.hypot(ev.clientX - started.x, ev.clientY - started.y) <= 5 &&
+        !props.current.pickMode &&
+        tapAction(ev)
+      )
+        return;
       if (
         props.current.viewOnly ||
         !started ||
@@ -449,18 +513,29 @@ const StudioCanvas = forwardRef(function StudioCanvas(
       const t = (now - start) / 1000;
       controls.update();
       const p = props.current;
-      if (!needsRender && !p.playing && !e.dragging && !e.cardDrag) return;
-      if (p.playing && !e.dragging) {
+      let acting = false;
+      for (const m of models.values())
+        if (isActing(m.group)) acting = true;
+      if (!needsRender && !p.playing && !e.dragging && !e.cardDrag && !acting)
+        return;
+      if ((p.playing || acting) && !e.dragging) {
         p.project.objects.forEach((o, i) => {
           const m = models.get(o.id)?.group;
-          if (!m) return;
+          if (!m || !(p.playing || isActing(m))) return;
           if (m.visible) tickModel(m, delta);
+          const fx = actionOffsets(m, now / 1000);
           m.position.y =
             o.position[1] +
-            (o.animation === "float" ? Math.sin(t * 1.6 + i) * 0.12 : 0);
+            (p.playing && o.animation === "float"
+              ? Math.sin(t * 1.6 + i) * 0.12
+              : 0) +
+            fx.y * o.scale;
           m.rotation.y =
             (o.rotation[1] * Math.PI) / 180 +
-            (o.animation === "spin" ? t * 0.28 : 0);
+            (p.playing && o.animation === "spin" ? t * 0.28 : 0) +
+            fx.rot;
+          m.rotation.z = (o.rotation[2] * Math.PI) / 180 + fx.tilt;
+          m.scale.setScalar(o.scale * fx.scale);
         });
       }
       if (selection.visible && p.selectedId) {
@@ -470,7 +545,8 @@ const StudioCanvas = forwardRef(function StudioCanvas(
           selection.scale.setScalar(Math.max(0.45, m.scale.x));
         }
       }
-      if (p.playing || e.dragging) renderer.shadowMap.needsUpdate = true;
+      if (p.playing || acting || e.dragging)
+        renderer.shadowMap.needsUpdate = true;
       renderer.render(scene, camera);
       positionCards(
         cardRegistry,
@@ -567,6 +643,7 @@ const StudioCanvas = forwardRef(function StudioCanvas(
         });
       }
       if (!e.dragging) applyObjectTransform(m.group, object);
+      setIdleClip(m.group, validIdleClip(object.idleClip));
     }
     refreshModels();
     const selected = e.models.get(selectedId)?.group;
@@ -595,6 +672,11 @@ const StudioCanvas = forwardRef(function StudioCanvas(
   useEffect(() => {
     engine.current?.requestRender();
   }, [cards, selectedId, compactCards]);
+  useEffect(() => {
+    if (playing || viewOnly) return;
+    engine.current?.models.forEach((m) => stopActions(m.group));
+    setLooping({});
+  }, [playing, viewOnly]);
   useEffect(() => {
     const e = engine.current;
     if (!e) return;
@@ -634,6 +716,13 @@ const StudioCanvas = forwardRef(function StudioCanvas(
         }
         onOpen={onOpenCard}
       />
+      {showActions && (
+        <ActionBar
+          objects={project.objects}
+          looping={looping}
+          onPlay={(object, action) => runAction(object.id, action)}
+        />
+      )}
       {(modelSummary.loading > 0 || modelSummary.errors.length > 0) &&
         !error && (
           <div

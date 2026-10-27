@@ -31,6 +31,14 @@ import {
   tickModel,
 } from "../lib/assets";
 import { markerPdf } from "../lib/pdf";
+import {
+  actionOffsets,
+  playAction,
+  setIdleClip,
+  stopAllSounds,
+  validIdleClip,
+} from "../lib/model-actions";
+import { ActionBar } from "./ModelActions";
 
 export function LinkError({ message }) {
   return (
@@ -107,7 +115,35 @@ function ViewerExperience({ project, lesson }) {
     [tips, setTips] = useState(false),
     [busy, setBusy] = useState(false),
     [scale, setScale] = useState(1),
-    [openCard, setOpenCard] = useState(null);
+    [openCard, setOpenCard] = useState(null),
+    [arLooping, setArLooping] = useState({}),
+    [soundError, setSoundError] = useState("");
+  const hasActions = project.objects.some(
+    (o) => o.visible !== false && o.actions?.length,
+  );
+  function onSoundError() {
+    setSoundError("A sound could not play. Check your phone is not on silent.");
+  }
+  function playArAction(object, action) {
+    const index = project.objects.indexOf(object);
+    const model = content.current?.children[index];
+    if (!model) return;
+    const result = playAction(model, action, onSoundError);
+    setArLooping((current) => {
+      const next = { ...current };
+      if (result === "loop") next[object.id] = action.id;
+      else delete next[object.id];
+      return next;
+    });
+  }
+  const playArRef = useRef(playArAction);
+  playArRef.current = playArAction;
+  useEffect(() => {
+    if (!soundError) return;
+    const id = setTimeout(() => setSoundError(""), 4000);
+    return () => clearTimeout(id);
+  }, [soundError]);
+  useEffect(() => () => stopAllSounds(), []);
   const cards = project.cards || [],
     compact = useCompact(),
     arCards = useRef({});
@@ -146,8 +182,46 @@ function ViewerExperience({ project, lesson }) {
         mindar.cssRenderer?.domElement?.remove();
       }
       stream?.getTracks().forEach((t) => t.stop());
+      cameraHost.current?.removeEventListener("pointerdown", tapStart);
+      cameraHost.current?.removeEventListener("pointerup", tapEnd);
+      stopAllSounds();
+      setArLooping({});
       ar.current = null;
       content.current = null;
+    };
+    // Tapping a model in AR plays its first play button.
+    let tapPoint = null;
+    const tapStart = (ev) => {
+      tapPoint = { x: ev.clientX, y: ev.clientY };
+    };
+    const tapEnd = (ev) => {
+      const started = tapPoint;
+      tapPoint = null;
+      if (
+        !started ||
+        !mindar?.renderer ||
+        !contentGroup ||
+        Math.hypot(ev.clientX - started.x, ev.clientY - started.y) > 10
+      )
+        return;
+      const rect = mindar.renderer.domElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const pointer = new THREE.Vector2(
+        ((ev.clientX - rect.left) / rect.width) * 2 - 1,
+        -((ev.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(pointer, mindar.camera);
+      const hit = raycaster.intersectObjects(
+        contentGroup.children.filter((m) => m.visible),
+        true,
+      )[0];
+      let target = hit?.object;
+      while (target && target.parent !== contentGroup) target = target.parent;
+      const index = target ? contentGroup.children.indexOf(target) : -1;
+      const object = project.objects[index];
+      if (object?.actions?.length)
+        playArRef.current(object, object.actions[0]);
     };
     const start = async () => {
       try {
@@ -231,8 +305,11 @@ function ViewerExperience({ project, lesson }) {
         project.objects.forEach((o) => {
           const model = createAsset(o.assetId, o.color, o.model);
           applyObjectTransform(model, o);
+          setIdleClip(model, validIdleClip(o.idleClip));
           contentGroup.add(model);
         });
+        cameraHost.current?.addEventListener("pointerdown", tapStart);
+        cameraHost.current?.addEventListener("pointerup", tapEnd);
         if (contentGroup.children.some((model) => model.userData.loading))
           setLoading("Loading your 3D models…");
         await Promise.all(
@@ -287,10 +364,17 @@ function ViewerExperience({ project, lesson }) {
           project.objects.forEach((o, i) => {
             const model = contentGroup.children[i];
             if (model.visible) tickModel(model, delta);
-            if (o.animation === "float")
-              model.position.y = o.position[1] + Math.sin(t * 1.6 + i) * 0.12;
-            if (o.animation === "spin")
-              model.rotation.y = (o.rotation[1] * Math.PI) / 180 + t * 0.28;
+            const fx = actionOffsets(model, now / 1000);
+            model.position.y =
+              o.position[1] +
+              (o.animation === "float" ? Math.sin(t * 1.6 + i) * 0.12 : 0) +
+              fx.y * o.scale;
+            model.rotation.y =
+              (o.rotation[1] * Math.PI) / 180 +
+              (o.animation === "spin" ? t * 0.28 : 0) +
+              fx.rot;
+            model.rotation.z = (o.rotation[2] * Math.PI) / 180 + fx.tilt;
+            model.scale.setScalar(o.scale * fx.scale);
           });
           mindar.renderer.render(mindar.scene, mindar.camera);
           if (cards.length && anchor.group.visible) {
@@ -449,6 +533,19 @@ function ViewerExperience({ project, lesson }) {
             </button>
           </div>
         )}
+        {soundError && (
+          <div className="action-sound-error" role="alert">
+            {soundError}
+          </div>
+        )}
+        {hasActions && ready && tracking && (
+          <ActionBar
+            className="ar-action-bar"
+            objects={project.objects}
+            looping={arLooping}
+            onPlay={playArAction}
+          />
+        )}
         <div className="ar-bottom">
           <span className="ar-privacy">
             <ShieldCheck size={14} />
@@ -490,11 +587,18 @@ function ViewerExperience({ project, lesson }) {
             project={project}
             viewOnly
             playing
+            showActions
+            onSoundError={onSoundError}
             grid={false}
             cards={cards}
             compactCards={compact}
             onOpenCard={setOpenCard}
           />
+          {soundError && (
+            <div className="action-sound-error" role="alert">
+              {soundError}
+            </div>
+          )}
           <span className="viewer-scene-badge">
             <Box size={14} />
             {mode === "3d"
@@ -514,6 +618,9 @@ function ViewerExperience({ project, lesson }) {
           </span>
           <h1>{project.title}</h1>
           <p className="viewer-description">
+            {hasActions
+              ? "Tap the play buttons (or the model) to see it move and hear its sounds. "
+              : ""}
             {cards.length
               ? `Tap the ${cards.length === 1 ? "lesson box" : `${cards.length} lesson boxes`} to read, listen, watch or open links.`
               : "There’s a whole little world waiting to step off your screen."}
