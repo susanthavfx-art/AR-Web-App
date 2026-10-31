@@ -43,6 +43,19 @@
       ],
       "animate": true
     },
+    {
+      "id": "halloween_pumpkin",
+      "name": "halloween_pumpkin",
+      "category": "halloween",
+      "file": "pumpkin_halloween_animation.glb",
+      "height": 1.5,
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "animate": true
+    },
      {
       "id": "stegasaurus",
       "name": "stegosaurus",
