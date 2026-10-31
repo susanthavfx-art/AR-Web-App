@@ -33,7 +33,7 @@
     {
       "id": "halloween_bat",
       "name": "halloween_bat",
-      "category": "Dinosaurs",
+      "category": "halloween",
       "file": "animated_halloween_bat.glb",
       "height": 1.5,
       "rotation": [
